@@ -285,6 +285,7 @@ private:
   edm::EDGetTokenT<reco::EvtPlaneCollection> tok_eventplaneSrc_;
   edm::EDGetTokenT<reco::BeamSpot> bsLabel_;
 
+
   //For ip3d and ip3derr
   bool ip_tree_;
   const edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> bFieldToken_;
@@ -524,6 +525,7 @@ VCTreeProducer_D02kpi::VCTreeProducer_D02kpi(const edm::ParameterSet &iConfig):
 
 	ip_tree_ = iConfig.getParameter<bool>("ip_tree");
 	
+
 }
 
 
@@ -575,6 +577,8 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 	edm::Handle<pat::CompositeCandidateCollection> D0candidates;
 	iEvent.getByToken(patCompositeCandidateCollection_Token_, D0candidates);
 
+
+	
 	//This is done to handle candSize=0 events!
     const pat::CompositeCandidateCollection* D0candidates_ = nullptr;
     if (D0candidates.isValid()) {
@@ -683,11 +687,32 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 
 	resize_the_vectors(candSize);
 
+
+	
 	if (D0candidates_){
+	 
+	  //To recover ptErr
+	  std::map<std::pair<float, float>, float> eventTrackErrorMap;
+   
+	  // Scan all D0 candidates to find any successful pseudoTrack extractions
+	  for (unsigned int i = 0; i < D0candidates_->size(); ++i) {
+	    const pat::CompositeCandidate &cand = (*D0candidates_)[i];
+	    for (int d = 0; d < 2; ++d) {
+	      const pat::PackedCandidate* dau = dynamic_cast<const pat::PackedCandidate*>(cand.daughter(d));
+	      if (!dau) continue;    
+	      float err = dau->pseudoTrack().ptError();
+	      // Store only if it's a valid, non-glitched error
+	      if (err > 0 && err < 1000.0) {
+		eventTrackErrorMap[std::make_pair(dau->pt(), dau->phi())] = err;
+	      }
+	    }
+	  }
+	  	  
 	  for (unsigned it = 0; it < D0candidates_->size(); ++it)
 	    {
 	      
 		const pat::CompositeCandidate &trk = (*D0candidates_)[it];
+
 		double secvz = -999.9, secvx = -999.9, secvy = -999.9;
 		secvz = trk.userFloat("vtxZ");
 		secvx = trk.userFloat("vtxX");
@@ -756,6 +781,45 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 		int reco_d2_charge = TMath::Sign(1, reco_d2->pdgId());
 
 
+
+		//To recover ptErr!
+		auto getRecoveredError = [&](const pat::PackedCandidate* d) {
+					   if (!d) return -999.0f;
+					   float e = d->pseudoTrack().ptError();
+					   
+					   // If it's the bad 1e+06 value
+					   if (e > 1000.0) {
+					     auto match = eventTrackErrorMap.find(std::make_pair(d->pt(), d->phi()));
+					     if (match != eventTrackErrorMap.end()) {
+					       return match->second; // Fixed!
+					     } else {
+					     // Used for single-candidate events where the matrix is missing.
+					     // Formula: pt^2 * sigma(curvature) where sigma(curvature) ~ 0.01 GeV^-1
+					       return (float)(d->pt() * d->pt() * 0.01); 
+					     }
+					   }
+					   return e;
+					 };
+		
+		ptErr1[it] = getRecoveredError(reco_d1);
+		ptErr2[it] = getRecoveredError(reco_d2);
+		
+		
+		/*
+		  std::cout << "-------------------------------------------" << std::endl;
+		std::cout << "Event: " << iEvent.id().event() << " | Candidate Index: " << it << std::endl;
+		if (reco_d1) {
+		  std::cout << "Dau1 [pt=" << reco_d1->pt() << "]: ptErr1=" << ptErr1[it] 
+			    << " | hasTrack=" << (reco_d1->bestTrack() != nullptr) 
+			    << " | hasDetails=" << reco_d1->hasTrackDetails() << std::endl;
+		}
+		if (reco_d2) {
+		  std::cout << "Dau2 [pt=" << reco_d2->pt() << "]: ptErr2=" << ptErr2[it] 
+			    << " | hasTrack=" << (reco_d2->bestTrack() != nullptr) 
+			    << " | hasDetails=" << reco_d2->hasTrackDetails() << std::endl;
+		}
+		std::cout << "-------------------------------------------" << std::endl;
+		*/
 		matchGEN[it] = false;
 		isSwap[it] = false;
 		idmom_reco[it] = -77;
@@ -964,7 +1028,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 		const reco::Track& pseudoTrk1 = dau1->pseudoTrack();
 
 		trkChi1[it] = pseudoTrk1.normalizedChi2();
-		ptErr1[it] = pseudoTrk1.ptError();
+		//ptErr1[it] = pseudoTrk1.ptError(); //old
 
 		secvz = trk.vz();
 		secvx = trk.vx();
@@ -990,12 +1054,11 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 
 		const reco::Track &pseudoTrk2 = dau2->pseudoTrack();
 		trkChi2[it] = pseudoTrk2.normalizedChi2();
-		ptErr2[it] = pseudoTrk2.ptError();
+		//ptErr2[it] = pseudoTrk2.ptError();
 
 		secvz = trk.vz();
 		secvx = trk.vx();
 		secvy = trk.vy();
-
 
 		// DCA
 		double dzbest2 = dau2->pseudoTrack().dz(bestvtx);	
