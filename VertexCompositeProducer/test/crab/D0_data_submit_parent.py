@@ -1,8 +1,20 @@
 from CRABClient.UserUtilities import config #, getUsernameFromSiteDB
-config = config()
 
-config.General.workArea = 'D0_2023PbPb_new'
-config.General.requestName = 'HIPhysicsRawPrime15_Oct23'
+# =============================
+# User-editable section
+# =============================
+username = "nsaha"        
+tag      = "Oct23"
+data     = "HIPhysicsRawPrime15"
+inputSkimDataset = '/HIPhysicsRawPrime15/nsaha-HIPhysicsRawPrime15_D0_10Sept2025-8b581d8886e57c0efd46b0be657273da/USER'
+
+
+# =============================
+# CRAB configuration
+# =============================
+config = config()
+config.General.workArea = 'D0_2023PbPb_skimEDM'
+config.General.requestName = f'{data}_{tag}'
 config.General.transferOutputs = True
 config.General.transferLogs = True
 
@@ -14,16 +26,16 @@ config.JobType.allowUndistributedCMSSW = True
 config.JobType.inputFiles = ['../HeavyIonRPRcd_PbPb2023_offline.db']
 
 config.Data.lumiMask = 'Cert_Collisions2023HI_374288_375823_Golden.json'
-config.Data.inputDataset = '/HIPhysicsRawPrime15/nsaha-HIPhysicsRawPrime15_D0_10Sept2025-8b581d8886e57c0efd46b0be657273da/USER'
+config.Data.inputDataset = inputSkimDataset
 config.Data.splitting = 'FileBased'
 config.Data.useParent = True
 config.Data.inputDBS = 'phys03'
 config.Data.unitsPerJob = 1
 config.Data.totalUnits = -1
 
-config.Data.outLFNDirBase = '/store/user/nsaha/D0_2023PbPb_new/' 
+config.Data.outLFNDirBase = f'/store/user/{username}/D0_2023PbPb_skimEDM/' 
 config.Data.publication = True
-config.Data.outputDatasetTag = 'HIPhysicsRawPrime15_Oct23'
+config.Data.outputDatasetTag = f'{data}_{tag}'
 
 config.Site.storageSite = 'T2_US_Purdue'
 
