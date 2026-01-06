@@ -690,24 +690,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 
 	
 	if (D0candidates_){
-	 
-	  //To recover ptErr
-	  std::map<std::pair<float, float>, float> eventTrackErrorMap;
-   
-	  // Scan all D0 candidates to find any successful pseudoTrack extractions
-	  for (unsigned int i = 0; i < D0candidates_->size(); ++i) {
-	    const pat::CompositeCandidate &cand = (*D0candidates_)[i];
-	    for (int d = 0; d < 2; ++d) {
-	      const pat::PackedCandidate* dau = dynamic_cast<const pat::PackedCandidate*>(cand.daughter(d));
-	      if (!dau) continue;    
-	      float err = dau->pseudoTrack().ptError();
-	      // Store only if it's a valid, non-glitched error
-	      if (err > 0 && err < 1000.0) {
-		eventTrackErrorMap[std::make_pair(dau->pt(), dau->phi())] = err;
-	      }
-	    }
-	  }
-	  	  
+	 	  	  
 	  for (unsigned it = 0; it < D0candidates_->size(); ++it)
 	    {
 	      
@@ -777,36 +760,55 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 		const reco::Candidate *cand2 = trk.daughter(1);
 		const pat::PackedCandidate *reco_d2 = dynamic_cast<const pat::PackedCandidate *>(cand2);
 
+
+
+
 		int reco_d1_charge = TMath::Sign(1, reco_d1->pdgId());
 		int reco_d2_charge = TMath::Sign(1, reco_d2->pdgId());
 
 
-
-		//To recover ptErr!
-		auto getRecoveredError = [&](const pat::PackedCandidate* d) {
-					   if (!d) return -999.0f;
-					   float e = d->pseudoTrack().ptError();
-					   
-					   // If it's the bad 1e+06 value
-					   if (e > 1000.0) {
-					     auto match = eventTrackErrorMap.find(std::make_pair(d->pt(), d->phi()));
-					     if (match != eventTrackErrorMap.end()) {
-					       return match->second; // Fixed!
-					     } else {
-					     // Used for single-candidate events where the matrix is missing.
-					     // Formula: pt^2 * sigma(curvature) where sigma(curvature) ~ 0.01 GeV^-1
-					       return (float)(d->pt() * d->pt() * 0.01); 
-					     }
-					   }
-					   return e;
-					 };
+		// --- Recovery for ptErrors (from skim edm only) ---
+		float e1 = reco_d1->pseudoTrack().ptError();
+		if (e1 > 1000.0) {
+		  const auto& cov = reco_d1->pseudoTrack().covariance();
+		  double p  = reco_d1->p();
+		  double pt = reco_d1->pt();
+		  double pz = reco_d1->pz();
+		  
+		  // Term 1: Variance of q/p
+		  double term1 = (p * pt) * (p * pt) * cov(0,0);
+		  // Term 2: Variance of dip angle (lambda)
+		  double term2 = (pz * pz) * cov(1,1);
+		  // Term 3: Covariance (Correlation)
+		  double term3 = 2.0 * (p * pt) * pz * cov(0,1);
+		  
+		  double totalVar = term1 + term2 + term3;
+		  if (totalVar > 0) {
+		    e1 = (float)std::sqrt(totalVar);
+		  } 
+		}
+		ptErr1[it] = e1;
 		
-		ptErr1[it] = getRecoveredError(reco_d1);
-		ptErr2[it] = getRecoveredError(reco_d2);
+		float e2 = reco_d2->pseudoTrack().ptError();
+		if (e2 > 1000.0) {
+		  const auto& cov = reco_d2->pseudoTrack().covariance();
+		  double p  = reco_d2->p();
+		  double pt = reco_d2->pt();
+		  double pz = reco_d2->pz();
+		  
+		  double term1 = (p * pt) * (p * pt) * cov(0,0);
+		  double term2 = (pz * pz) * cov(1,1);
+		  double term3 = 2.0 * (p * pt) * pz * cov(0,1);
+		  
+		  double totalVar = term1 + term2 + term3;
+		  if (totalVar > 0) {
+		    e2 = (float)std::sqrt(totalVar);
+		  } 
+		}
+		ptErr2[it] = e2;
 		
-		
-		/*
-		  std::cout << "-------------------------------------------" << std::endl;
+ 		
+		/*std::cout << "-------------------------------------------" << std::endl;
 		std::cout << "Event: " << iEvent.id().event() << " | Candidate Index: " << it << std::endl;
 		if (reco_d1) {
 		  std::cout << "Dau1 [pt=" << reco_d1->pt() << "]: ptErr1=" << ptErr1[it] 
@@ -817,9 +819,11 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 		  std::cout << "Dau2 [pt=" << reco_d2->pt() << "]: ptErr2=" << ptErr2[it] 
 			    << " | hasTrack=" << (reco_d2->bestTrack() != nullptr) 
 			    << " | hasDetails=" << reco_d2->hasTrackDetails() << std::endl;
-		}
+			    }
 		std::cout << "-------------------------------------------" << std::endl;
 		*/
+
+		
 		matchGEN[it] = false;
 		isSwap[it] = false;
 		idmom_reco[it] = -77;
