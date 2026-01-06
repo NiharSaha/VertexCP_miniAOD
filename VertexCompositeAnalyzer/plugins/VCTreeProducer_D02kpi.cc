@@ -761,8 +761,6 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 		const pat::PackedCandidate *reco_d2 = dynamic_cast<const pat::PackedCandidate *>(cand2);
 
 
-
-
 		int reco_d1_charge = TMath::Sign(1, reco_d1->pdgId());
 		int reco_d2_charge = TMath::Sign(1, reco_d2->pdgId());
 
@@ -807,22 +805,6 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 		}
 		ptErr2[it] = e2;
 		
- 		
-		/*std::cout << "-------------------------------------------" << std::endl;
-		std::cout << "Event: " << iEvent.id().event() << " | Candidate Index: " << it << std::endl;
-		if (reco_d1) {
-		  std::cout << "Dau1 [pt=" << reco_d1->pt() << "]: ptErr1=" << ptErr1[it] 
-			    << " | hasTrack=" << (reco_d1->bestTrack() != nullptr) 
-			    << " | hasDetails=" << reco_d1->hasTrackDetails() << std::endl;
-		}
-		if (reco_d2) {
-		  std::cout << "Dau2 [pt=" << reco_d2->pt() << "]: ptErr2=" << ptErr2[it] 
-			    << " | hasTrack=" << (reco_d2->bestTrack() != nullptr) 
-			    << " | hasDetails=" << reco_d2->hasTrackDetails() << std::endl;
-			    }
-		std::cout << "-------------------------------------------" << std::endl;
-		*/
-
 		
 		matchGEN[it] = false;
 		isSwap[it] = false;
@@ -1022,9 +1004,9 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 		SVector3 distanceVector2D(secvx - bestvx, secvy - bestvy, 0);
 
 		dl2D[it] = ROOT::Math::Mag(distanceVector2D);
-		double dl2Derror = sqrt(ROOT::Math::Similarity(totalCov2D, distanceVector2D))/dl2D[it];
+		dl2Derror[it] = sqrt(ROOT::Math::Similarity(totalCov2D, distanceVector2D))/dl2D[it];
 
-		dlos2D[it] = dl2D[it]/dl2Derror;
+		dlos2D[it] = dl2D[it]/dl2Derror[it];
 
 		//trk info
 
