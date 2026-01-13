@@ -776,6 +776,10 @@ void LamC3PFitter::fitLamCCandidates(
 		theLamC3P.addDaughter(cand2);
 		theLamC3P.addDaughter(cand3);
 
+		theLamC3P.addUserFloat("ptErr_dau1", cand1.pseudoTrack().ptError());
+		theLamC3P.addUserFloat("ptErr_dau2", cand2.pseudoTrack().ptError());
+		theLamC3P.addUserFloat("ptErr_dau3", cand3.pseudoTrack().ptError());
+		
 		//Add user variables!      
 		theLamC3P.addUserFloat("vtxX", LamC3P_Vtx.x());
 		theLamC3P.addUserFloat("vtxY", LamC3P_Vtx.y());

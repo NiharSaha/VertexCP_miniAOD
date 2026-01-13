@@ -499,8 +499,24 @@ void VCTreeProducer_LamC3P::fillRECO(const edm::Event& iEvent, const edm::EventS
 	edm::Handle<pat::CompositeCandidateCollection> lamC3Pcandidates;
 	iEvent.getByToken(patCompositeCandidateCollection_Token_,lamC3Pcandidates);
 
-	const pat::CompositeCandidateCollection * lamC3Pcandidates_ = lamC3Pcandidates.product();
+	//const pat::CompositeCandidateCollection * lamC3Pcandidates_ = lamC3Pcandidates.product();
 
+	//This is done to handle candSize=0 events!                                                                                                     
+	const pat::CompositeCandidateCollection* lamC3Pcandidates_ = nullptr;
+	if (lamC3Pcandidates.isValid()) {
+	  lamC3Pcandidates_ = lamC3Pcandidates.product();
+	  candSize = lamC3Pcandidates_->size();
+	}
+	else {
+	  edm::LogWarning("MissingProduct")
+            << "D0 collection not found in this event!"
+            << " (Run : Lumi : Event )=" <<"("<< iEvent.id().run()<<","<<iEvent.luminosityBlock()<<","<<iEvent.id().event()<<")"<<endl;
+	  candSize=0;
+	}
+
+
+
+	
 	edm::Handle<reco::GenParticleCollection> genpars;	
 	if (doGenMatching_) {
 		iEvent.getByToken(tok_genParticle_, genpars);
@@ -569,12 +585,11 @@ void VCTreeProducer_LamC3P::fillRECO(const edm::Event& iEvent, const edm::EventS
 	BSdydz   = beamSpot.dydz();
 
 
-	//RECO Candidate info
-	candSize = lamC3Pcandidates_->size();	
+		
 	manageVectorsSize(candInfo, candSize);
 
-
-	for(int it=0; it<candSize; ++it){
+	if (lamC3Pcandidates_){
+	for(unsigned it=0; it<lamC3Pcandidates_->size(); ++it){
 
 
 		const pat::CompositeCandidate & trk = (*lamC3Pcandidates_)[it];
@@ -946,7 +961,7 @@ void VCTreeProducer_LamC3P::fillRECO(const edm::Event& iEvent, const edm::EventS
 #endif
 
 	}// Candidate loop
-
+	}// if lam3P cand loop
 #ifdef DEBUG
 	cout << "Fill reco done" << endl;
 #endif
