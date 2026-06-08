@@ -26,9 +26,9 @@ process.load('FWCore.MessageService.MessageLogger_cfi')
 process.MessageLogger.cerr.FwkReport.reportEvery = 1
 process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
 
-process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(100))
+process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(-1))
 process.TFileService = cms.Service("TFileService",
-    fileName =cms.string('TTree_Jun8.root'))
+    fileName =cms.string('TTree.root'))
 
 
 # Define the input source
