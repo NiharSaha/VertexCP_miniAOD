@@ -26,9 +26,9 @@ process.load('FWCore.MessageService.MessageLogger_cfi')
 process.MessageLogger.cerr.FwkReport.reportEvery = 1
 process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
 
-process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(-1))
+process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(100))
 process.TFileService = cms.Service("TFileService",
-    fileName =cms.string('TTree.root'))
+    fileName =cms.string('TTree_Jun8.root'))
 
 
 # Define the input source
@@ -63,6 +63,27 @@ process.centralityBin.centralityVariable = cms.string("HFtowers")
 
 
 # =============== Import Sequences =====================
+
+# ======= ZDC RecHit Producer =========                                                                                                   
+process.load('HeavyIonsAnalysis.ZDCAnalysis.QWZDC2018Producer_cfi')
+process.load('HeavyIonsAnalysis.ZDCAnalysis.QWZDC2018RecHit_cfi')
+process.load('HeavyIonsAnalysis.ZDCAnalysis.zdcanalyzer_cfi')
+
+process.zdcdigi.SOI = cms.untracked.int32(2)
+process.zdcanalyzer.doZDCRecHit = False
+process.zdcanalyzer.doZDCDigi = True
+process.zdcanalyzer.zdcRecHitSrc = cms.InputTag("QWzdcreco")
+process.zdcanalyzer.zdcDigiSrc = cms.InputTag("hcalDigis", "ZDC")
+process.zdcanalyzer.calZDCDigi = False
+process.zdcanalyzer.verbose = False
+process.zdcanalyzer.nZdcTs = cms.int32(6)
+
+process.zdc_seq = cms.Sequence(
+    process.zdcdigi +
+    process.zdcanalyzer
+)
+
+#========== End ZDC =============
 
 # Add PbPb collision event selection
 process.load('HeavyIonsAnalysis.EventAnalysis.skimanalysis_cfi')
@@ -208,7 +229,8 @@ process.Ana_seq = cms.Path(
     process.evtplane_seq *
     process.generalD0CandidatesNew *
     process.d0ana_seq2 *
-    process.EventInfoAnalysis
+    process.EventInfoAnalysis *
+    process.zdc_seq
 )
 
 process.schedule = cms.Schedule(process.Ana_seq)
