@@ -1,15 +1,15 @@
-#Author: Abby Wesolek
+#Author: Nihar Saha
 
-# This file contains the default values of parameters passed to VertexCompositeAnalyzer/plugins/VCSelelctor_D02kpi.cc
+# This file contains the default values of parameters passed to VertexCompositeAnalyzer/plugins/VCTreeProducer_LamC3P.cc
 #if no other values are specfied in the config file, these will be used.
 import FWCore.ParameterSet.Config as cms
 
-d0selector = cms.EDProducer('VCSelector_D02kpi',
-  doGenMatching = cms.untracked.bool(False),
-  hasSwap = cms.untracked.bool(True),
+lamc3pselector = cms.EDProducer('VCSelector_LamC3P',
+  doGenMatching = cms.bool(False),
+  hasSwap = cms.untracked.bool(False),
   decayInGen = cms.untracked.bool(False),
   twoLayerDecay = cms.untracked.bool(False),
-  threeProngDecay = cms.untracked.bool(False),
+  threeProngDecay = cms.untracked.bool(True),
 
   selectGenMatch = cms.untracked.bool(False),
   selectGenUnMatch = cms.untracked.bool(False),
@@ -17,27 +17,27 @@ d0selector = cms.EDProducer('VCSelector_D02kpi',
   selectGenMatchUnSwap = cms.untracked.bool(False),
 
   #PID used only for GEN and/or GEN match
-  PID = cms.untracked.int32(421),
-  PID_dau1 = cms.untracked.int32(211),
-  PID_dau2 = cms.untracked.int32(321),
+  PID = cms.untracked.int32(4122),
+  PID_dau1 = cms.untracked.int32(321),
+  PID_dau2 = cms.untracked.int32(2212),
+  PID_dau3 = cms.untracked.int32(211),
   VertexCollection = cms.InputTag("offlineSlimmedPrimaryVertices"),
   TrackCollection = cms.InputTag("packedPFCandidates"),
-  VertexCompositeCollection = cms.InputTag("generalD0CandidatesNew:D0"),
-  GenParticleCollection = cms.untracked.InputTag("prunedGenParticles"),
-  MuonCollection = cms.untracked.InputTag("null"),
+  VertexCompositeCollection = cms.InputTag("generalLamC3PCandidatesNew:LamC3P"),
+  GenParticleCollection = cms.InputTag("prunedGenParticles"),
+  MuonCollection = cms.untracked.InputTag("null"),  
   doMuon = cms.untracked.bool(False),
   doMuonFull = cms.untracked.bool(False),
   
   useAnyMVA = cms.bool(False),
   useExistingMVA = cms.bool(False),
   mvaType = cms.string('BDT'),
-  GBRForestLabel = cms.string('D0InpPb'),
-  GBRForestFileName = cms.string('GBRForestfile_BDT_D0InpPb_1_2.root'),
-  MVACollection = cms.InputTag("generalD0CandidatesNew:MVAValues"),
+  GBRForestLabel = cms.string('LamC3PInpPb'),
+  GBRForestFileName = cms.string('GBRForestfile_BDT_LamC3PInpPb_1_2.root'),
+  MVACollection = cms.InputTag("generalLamC3PCandidatesNew:MVAValues"),
   mvaMax = cms.untracked.double(999.9),
   mvaMin = cms.untracked.double(-999.9),
   mvaCuts = cms.vdouble(-1.,0,0,0,0),
-
   trkHighPurity = cms.untracked.bool(True),
   trkPMin = cms.untracked.double(0.),
   trkPtMin = cms.untracked.double(0.),
@@ -62,8 +62,10 @@ d0selector = cms.EDProducer('VCSelector_D02kpi',
   cand2DDCAMax = cms.untracked.double(999.),
   candVtxProbMin = cms.untracked.double(0.),
 
-  isCentrality = cms.bool(False),
+  isCentrality = cms.bool(True),
   centralityBinLabel = cms.InputTag("centralityBin","HFtowers"),
-  centralitySrc = cms.InputTag("hiCentrality")
-                              )
+  centralitySrc = cms.InputTag("hiCentrality"),
+  centMin = cms.untracked.int32(0),
+  centMax = cms.untracked.int32(1000)
+)
 

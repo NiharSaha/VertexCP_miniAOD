@@ -1,3 +1,31 @@
+////////////////////
+// Orgininal author: Abby Wesolek 
+// last updates: 01 October 2025 
+// contact:abigail.leigh.wesolek@cern.ch
+////////////////////
+////////////////////
+////////////////////
+// this selector.cc applies cuts to the reconstructed D0 candidates
+// currently the only cut that is applied is the mva and mva_xg cuts 
+// these are for TMVA BDT and XGBoost BDT trainings
+// these cuts are applied with an OR meaning as long as the candidate passes one of the two mva cuts it is kept
+// all other cuts have minimal cut values, so minimall, in fact, they have no effect
+// to apply those cuts one needs to change the cut values in the VertexCompositeAnalyzer/python/d0selector_cfi.py file 
+////////////////////
+// the XGBoost code implementation: Junseok Lee
+// last updates: 05 June 2025
+// contact: junseok.lee@cern.ch
+/////////////////////
+// the output of this code consists of 3 collections all of which are stored in the edm.root file
+// 1. the selected D0 candidates after cuts (vector<pat::CompositeCandidate>  -- D0)
+//   -- line 610
+// 2. the TMVA BDT values for each D0 candidate (vector<float> -- MVAValuesNewD0)
+//   -- line 620
+// 3. the XGBoost BDT values for each D0 candidate (vector<float> -- MVAValuesNewD02) 
+//   -- line 621
+// (hint: see VertexCompositeProducer/test/run_edm_and_ttree_DATA_forD0.py for more details)
+///////////////////////
+
 // system include files
 #include <memory>
 #include <string>
@@ -191,14 +219,14 @@ class BDTHandler
 		}
 };
 
-class VertexCompositeSelector : public edm::stream::EDProducer<edm::GlobalCache<ONNXRuntime>>
+class VCSelector_D02kpi : public edm::stream::EDProducer<edm::GlobalCache<ONNXRuntime>>
 {
 
 	public:
-		explicit VertexCompositeSelector(const edm::ParameterSet &, const ONNXRuntime *cache);
+		explicit VCSelector_D02kpi(const edm::ParameterSet &, const ONNXRuntime *cache);
 		static std::unique_ptr<ONNXRuntime> initializeGlobalCache(const edm::ParameterSet &);
 		static void globalEndJob(const ONNXRuntime *);
-		~VertexCompositeSelector();
+		~VCSelector_D02kpi();
 
 		using MVACollection = std::vector<float>;
 
@@ -382,7 +410,7 @@ class VertexCompositeSelector : public edm::stream::EDProducer<edm::GlobalCache<
 // constructors and destructor
 //
 
-VertexCompositeSelector::VertexCompositeSelector(const edm::ParameterSet &iConfig, const ONNXRuntime *cache)
+VCSelector_D02kpi::VCSelector_D02kpi(const edm::ParameterSet &iConfig, const ONNXRuntime *cache)
 	:  input_shapes_(), onnxRuntime_(cache)
 {
 	string a1 = "log3ddls";
@@ -515,7 +543,7 @@ VertexCompositeSelector::VertexCompositeSelector(const edm::ParameterSet &iConfi
 	isKaonD1 = false;
 	isKaonD2 = false;
 }
-std::unique_ptr<ONNXRuntime> VertexCompositeSelector::initializeGlobalCache(const edm::ParameterSet &iConfig)
+std::unique_ptr<ONNXRuntime> VCSelector_D02kpi::initializeGlobalCache(const edm::ParameterSet &iConfig)
 {
 	bool useAnyMVA = iConfig.exists("useAnyMVA") ? iConfig.getParameter<bool>("useAnyMVA") : false;
 
@@ -542,9 +570,9 @@ std::unique_ptr<ONNXRuntime> VertexCompositeSelector::initializeGlobalCache(cons
 
 	return nullptr;
 }
-void VertexCompositeSelector::globalEndJob(const ONNXRuntime *cache) {}
+void VCSelector_D02kpi::globalEndJob(const ONNXRuntime *cache) {}
 
-VertexCompositeSelector::~VertexCompositeSelector()
+VCSelector_D02kpi::~VCSelector_D02kpi()
 {
 
 	// do anything here that needs to be done at desctruction time
@@ -556,7 +584,7 @@ VertexCompositeSelector::~VertexCompositeSelector()
 //
 
 // ------------ method called to for each event  ------------
-void VertexCompositeSelector::produce(edm::Event &iEvent, const edm::EventSetup &iSetup)
+void VCSelector_D02kpi::produce(edm::Event &iEvent, const edm::EventSetup &iSetup)
 {
 
 	using std::vector;
@@ -567,7 +595,7 @@ void VertexCompositeSelector::produce(edm::Event &iEvent, const edm::EventSetup 
 
 	if (!patCandidates.isValid())
 	{
-		edm::LogError("VertexCompositeSelector") << "Error: patCandidates collection not found!";
+		edm::LogError("VCSelector_D02kpi") << "Error: patCandidates collection not found!";
 		return;
 	}
 
@@ -599,7 +627,7 @@ void VertexCompositeSelector::produce(edm::Event &iEvent, const edm::EventSetup 
 	}
 }
 
-void VertexCompositeSelector::fillRECO(edm::Event &iEvent, const edm::EventSetup &iSetup)
+void VCSelector_D02kpi::fillRECO(edm::Event &iEvent, const edm::EventSetup &iSetup)
 {
 	// get collections
 	edm::Handle<reco::VertexCollection> vertices;
@@ -682,8 +710,8 @@ void VertexCompositeSelector::fillRECO(edm::Event &iEvent, const edm::EventSetup
 		auto const *d1 = dynamic_cast<const pat::PackedCandidate *>(trk.daughter(0));
 		auto const *d2 = dynamic_cast<const pat::PackedCandidate *>(trk.daughter(1));
 
-		auto pseudoTrk1 = d1->pseudoTrack(); // today change
-		auto pseudoTrk2 = d2->pseudoTrack(); // today change
+		auto pseudoTrk1 = d1->pseudoTrack(); 
+		auto pseudoTrk2 = d2->pseudoTrack(); 
 
 		if (!d1)
 		{
@@ -828,8 +856,8 @@ void VertexCompositeSelector::fillRECO(edm::Event &iEvent, const edm::EventSetup
 		math::XYZPoint bestvtx(bestvx, bestvy, bestvz);
 
 
-		double dzbest1 = d1->pseudoTrack().dz(bestvtx); // today change
-		double dxybest1 = d1->pseudoTrack().dxy(bestvtx); // today change
+		double dzbest1 = d1->pseudoTrack().dz(bestvtx); 
+		double dxybest1 = d1->pseudoTrack().dxy(bestvtx); 
 		double dzerror1 = TMath::Sqrt(d1->pseudoTrack().dzError() * d1->pseudoTrack().dzError() + bestvzError * bestvzError);
 		double dxyerror1 = TMath::Sqrt(d1->pseudoTrack().dxyError()*d1->pseudoTrack().dxyError() + bestvxError*bestvyError);
 
@@ -848,8 +876,8 @@ void VertexCompositeSelector::fillRECO(edm::Event &iEvent, const edm::EventSetup
 		T4dedx2 = -999.9;
 
 
-		double dzbest2 = d2->pseudoTrack().dz(bestvtx);    // today change
-		double dxybest2 = d2->pseudoTrack().dxy(bestvtx); // today change
+		double dzbest2 = d2->pseudoTrack().dz(bestvtx);    
+		double dxybest2 = d2->pseudoTrack().dxy(bestvtx); 
 		double dzerror2 = TMath::Sqrt(d2->pseudoTrack().dzError() * d2->pseudoTrack().dzError() + bestvzError * bestvzError);
 		double dxyerror2 = TMath::Sqrt(d2->pseudoTrack().dxyError()*d2->pseudoTrack().dxyError() + bestvxError*bestvyError);
 
@@ -858,7 +886,6 @@ void VertexCompositeSelector::fillRECO(edm::Event &iEvent, const edm::EventSetup
 
 		mva_value = -999.9;
 		onnxVal = -999.9;
-		// if (useAnyMVA_ && onnxRuntime_)
 		if (useAnyMVA_ )
 		{
 
@@ -891,14 +918,14 @@ void VertexCompositeSelector::fillRECO(edm::Event &iEvent, const edm::EventSetup
 			}
 
 			inputValues.clear();
-			inputValues.push_back(log10(dlos)); // 00
-			inputValues.push_back(VtxProb);     // 01
-			inputValues.push_back(agl_abs);     // 02
-			inputValues.push_back(pt1);         // 03
-			inputValues.push_back(pt2);         // 04
-			inputValues.push_back(dxyos1);      // 04
-			inputValues.push_back(dxyos2);      // 04
-			inputValues.push_back(dzos1);       // 04
+			inputValues.push_back(log10(dlos)); 
+			inputValues.push_back(VtxProb);     
+			inputValues.push_back(agl_abs);     
+			inputValues.push_back(pt1);         
+			inputValues.push_back(pt2);         
+			inputValues.push_back(dxyos1);      
+			inputValues.push_back(dxyos2);      
+			inputValues.push_back(dzos1);       
 			inputValues.push_back(dzos2);
 			inputValues.push_back(pt);
 			inputValues.push_back(centrality);
@@ -908,32 +935,28 @@ void VertexCompositeSelector::fillRECO(edm::Event &iEvent, const edm::EventSetup
 
 
 			if (mva_value <= bdt_cut_value && onnxVal <= mvaCut_)
-			//if (mva_value <= bdt_cut_value )
-		        //if (bdt_cut_value < -2)
-			continue;
+				continue;
 
-			// cout << "candidate passed the cuts no problem" << endl;
 			theMVANew.push_back(mva_value);
 			theMVANew_xg.push_back(onnxVal);
 		}
 
-		// select MVA value
 		theGoodCandidates.push_back(trk);
 	}
 }
 
 // ------------ method called once each job just before starting event
 // loop  ------------
-void VertexCompositeSelector::beginJob()
+void VCSelector_D02kpi::beginJob()
 {
 }
 
 // ------------ method called once each job just after ending the event
 // loop  ------------
-void VertexCompositeSelector::endJob()
+void VCSelector_D02kpi::endJob()
 {
 }
 
 // define this as a plug-in
 #include "FWCore/PluginManager/interface/ModuleDef.h"
-DEFINE_FWK_MODULE(VertexCompositeSelector);
+DEFINE_FWK_MODULE(VCSelector_D02kpi);
