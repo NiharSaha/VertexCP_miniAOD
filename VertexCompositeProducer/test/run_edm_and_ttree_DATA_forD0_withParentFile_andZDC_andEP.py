@@ -2,9 +2,8 @@ import FWCore.ParameterSet.Config as cms
 from Configuration.StandardSequences.Eras import eras
 from Configuration.Eras.Era_Run3_pp_on_PbPb_2023_cff import Run3_pp_on_PbPb_2023
 
+process = cms.Process("d0ana", eras.Run3_2023, Run3_pp_on_PbPb_2023)
 
-#process = cms.Process('ANASKIM', eras.Run3_2023, Run3_pp_on_PbPb_2023)
-process = cms.Process("d0ana", Run3_pp_on_PbPb_2023)
 
 process.load('Configuration.StandardSequences.Services_cff')
 process.load('Configuration.StandardSequences.GeometryRecoDB_cff')
@@ -23,12 +22,12 @@ process.load("HeavyIonsAnalysis.EventAnalysis.HiForestInfo_cfi")
 
 # Limit the output messages
 process.load('FWCore.MessageService.MessageLogger_cfi')
-process.MessageLogger.cerr.FwkReport.reportEvery = 1
+process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
 
 process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(-1))
 process.TFileService = cms.Service("TFileService",
-    fileName =cms.string('TTree_fromEDM.root'))
+    fileName =cms.string('TTree_skimEDM.root'))
 
 
 # Define the input source
@@ -142,7 +141,7 @@ process.hiEvtPlaneFlat.caloCentRef=process.hiEvtPlane.caloCentRef
 process.hiEvtPlaneFlat.caloCentRefWidth=process.hiEvtPlane.caloCentRefWidth
 
 
-process.CondDB.connect = "sqlite_file:HeavyIonRPRcd_PbPb2023_offline.db"
+process.CondDB.connect = "sqlite_file:HeavyIonRPRcd_offline_PbPb2023_wEra.db"
 process.PoolDBESSource = cms.ESSource("PoolDBESSource",
                                       process.CondDB,
                                       toGet = cms.VPSet(cms.PSet(record = cms.string('HeavyIonRPRcd'),
@@ -192,10 +191,11 @@ process.eventinfoana.TrackCollection = cms.InputTag(TrackCollection_PAT)
 process.EventInfoAnalysis = cms.Sequence(process.eventinfoana)
 
 process.Ana_seq = cms.Path(
-    process.centralityBin *
     process.eventFilter_HLT *
     process.event_filters *
-    process.evtplane_seq *
+    process.centralityBin *
+    process.hiEvtPlane *
+    process.hiEvtPlaneFlat *
     process.d0ana_seq *
     process.EventInfoAnalysis *
     process.zdc_seq

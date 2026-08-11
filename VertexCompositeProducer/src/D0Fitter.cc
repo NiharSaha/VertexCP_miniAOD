@@ -512,7 +512,8 @@ void D0Fitter::fitAll(const edm::Event &iEvent, const edm::EventSetup &iSetup)
 
         double dcaError = sqrt(sigma_x2 * cxPt.x() * cxPt.x() + sigma_y2 * cxPt.y() * cxPt.y()) / dca;
 
-        // Create CompositeCandidate
+
+	// Create CompositeCandidate
         pat::CompositeCandidate theD0;
         theD0.setP4(d0P4);
         theD0.setPdgId(pdg_id[i]);
@@ -521,8 +522,7 @@ void D0Fitter::fitAll(const edm::Event &iEvent, const edm::EventSetup &iSetup)
         theD0.addUserFloat("ip3d", cur3DIP.value());
         theD0.addUserFloat("ip3derr", cur3DIP.error());
 
-        // Add the two daughters
-
+	// Add the two daughters
         tk1.setPdgId(pos_pdg_id[i]);
         tk2.setPdgId(neg_pdg_id[i]);
         theD0.addDaughter(tk1);

@@ -26,9 +26,9 @@ process.load('FWCore.MessageService.MessageLogger_cfi')
 process.MessageLogger.cerr.FwkReport.reportEvery = 1
 process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
 
-process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(-1))
+process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(100))
 process.TFileService = cms.Service("TFileService",
-    fileName =cms.string('TTree.root'))
+    fileName =cms.string('TTree_v1.root'))
 
 
 # Define the input source
@@ -36,7 +36,7 @@ process.TFileService = cms.Service("TFileService",
 process.source = cms.Source("PoolSource",
     duplicateCheckMode = cms.untracked.string("noDuplicateCheck"),
     fileNames = cms.untracked.vstring(
-       '/store/hidata/HIRun2023A/HIPhysicsRawPrime15/MINIAOD/PromptReco-v2/000/374/803/00000/3a60ae33-ff73-4889-9a42-6ab394143524.root'
+        '/store/hidata/HIRun2023A/HIPhysicsRawPrime0/MINIAOD/PromptReco-v1/000/373/870/00000/23b62195-9312-4b17-99d7-afcfd5b46159.root'
     ),
         #lumisToProcess = cms.untracked.VLuminosityBlockRange(
         #'374951:30-374951:30'  # run:lumiFirst - run:lumiLast
