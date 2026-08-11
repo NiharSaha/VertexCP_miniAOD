@@ -79,23 +79,10 @@ process.centralityBin.centralityVariable = cms.string("HFtowers")
 # =============== Import Sequences =====================
 
 # ======= ZDC RecHit Producer =========                                                                                                   
-process.load('HeavyIonsAnalysis.ZDCAnalysis.QWZDC2018Producer_cfi')
-process.load('HeavyIonsAnalysis.ZDCAnalysis.QWZDC2018RecHit_cfi')
-process.load('HeavyIonsAnalysis.ZDCAnalysis.zdcanalyzer_cfi')
-
-process.zdcdigi.SOI = cms.untracked.int32(2)
+process.load('HeavyIonsAnalysis.ZDCAnalysis.ZDCAnalyzersHC2023_cff')
 process.zdcanalyzer.doZDCRecHit = False
 process.zdcanalyzer.doZDCDigi = True
-process.zdcanalyzer.zdcRecHitSrc = cms.InputTag("QWzdcreco")
-process.zdcanalyzer.zdcDigiSrc = cms.InputTag("hcalDigis", "ZDC")
-process.zdcanalyzer.calZDCDigi = False
-process.zdcanalyzer.verbose = False
-process.zdcanalyzer.nZdcTs = cms.int32(6)
-
-process.zdc_seq = cms.Sequence(
-    process.zdcdigi +
-    process.zdcanalyzer
-)
+process.zdc_seq = cms.Sequence(process.zdcSequence)
 
 #========== End ZDC =============
 
