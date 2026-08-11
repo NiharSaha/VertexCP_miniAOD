@@ -66,7 +66,7 @@ CONFIG_DIR="crab_configs"
 ```
 
 **Note on Parameters:** 
-The most important parameters are `MIN_DATASET` and `MAX_DATASET`, which correspond to `HIPhysicsRawPrime[0-31]`. The script will automatically take all the skim EDMs corresponding to the specific `HIPhysicsRawPrime` range you define.
+The most important parameters are `MIN_DATASET` and `MAX_DATASET`, which correspond to `HIPhysicsRawPrime[0-31]`. The script will automatically take all the skim EDMs corresponding to the specific `HIPhysicsRawPrime` range you define. For example, if we have MIN_DATASET=0 and MAX_DATASET=0, it will submit two crab jobs corresponding to two skimEDMs for HIPhysicsRawPrime0. 
 
 
 
