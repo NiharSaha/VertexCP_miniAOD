@@ -1,12 +1,11 @@
 #!/bin/bash
 
 # ==========================================
-# TEAM MEMBER SETTINGS
+# USER SETTINGS
 # ==========================================
-# Edit these variables before running
-CMS_USER="nsaha" 
-MIN_DATASET=0
-MAX_DATASET=0
+CMS_USER="nsaha" #your user name
+MIN_DATASET=0    #Min and Max PD will take care all failed lumi skimEDM
+MAX_DATASET=0    # MIN_DATASET and MIN_DATASET range [0-31] corresponding to parent miniAOD!
 MANUAL_DATE="Aug11"
 INPUT_FILE="skim_edm_path.txt"
 CONFIG_DIR="crab_configs"
