@@ -6,7 +6,7 @@ cd CMSSW_13_2_11/src
 cmsenv 
 git clone -b D0analyzer_reproduction_TTree_skimmedEdm git@github.com:NiharSaha/VertexCP_miniAOD.git VertexCompositeAnalysis
 cd VertexCompositeAnalysis
-./setup 
+./setup.sh 
 cd ../HeavyIonsAnalysis/ZDCAnalysis/src
 ```
 Open `ZDCTreeProducer.cc` and comment out all branches from the ZDC digital TTree **except** `sumPlus` and `sumMinus`. 
@@ -37,6 +37,7 @@ for (int i = 0; i < NZDCTS; i++) {
 cd ../../../
 scram b -j8 
 cd VertexCompositeAnalysis/VertexCompositeProducer/test/ 
+voms
 cmsRun run_edm_and_ttree_DATA_forD0_withParentFile_andZDC_andEP.py 
 ```
 
