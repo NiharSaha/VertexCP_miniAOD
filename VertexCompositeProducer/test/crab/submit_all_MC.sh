@@ -4,7 +4,7 @@
 # User-Editable Variables
 # =========================================================
 USERNAME="nsaha"
-DATE="Aug24"
+DATE="Aug25"
 INPUT_FILE="Prompt_MC.txt"
 #INPUT_FILE="NonPrompt_MC.txt"
 TEMPLATE_FILE="D0_MC_submit.py"
