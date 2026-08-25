@@ -14,9 +14,6 @@ process.load('HeavyIonsAnalysis.EventAnalysis.hievtanalyzer_data_cfi')
 process.load('HeavyIonsAnalysis.EventAnalysis.hltanalysis_cfi')
 process.load('HeavyIonsAnalysis.EventAnalysis.hltobject_cfi')
 
-#process.load("HeavyIonsAnalysis.EventAnalysis.HiForestInfo_cfi")
-#process.HiForestInfo.info = cms.vstring("HiForest, miniAOD, 132X, mc")
-
 
 # Limit the output messages
 process.load('FWCore.MessageService.MessageLogger_cfi')
@@ -48,18 +45,15 @@ process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, '132X_mcRun3_2023_realistic_HI_v10', '')
 
-
-
 # Define centrality binning
 process.load("RecoHI.HiCentralityAlgos.CentralityBin_cfi")
 process.centralityBin.Centrality = cms.InputTag("hiCentrality")
 process.centralityBin.centralityVariable = cms.string("HFtowers")
 
 
-
 # =============== Import Sequences =====================
 
-#ZDC RecHit Producer                                                                                                   
+#ZDC RecHit Producer (Not required for MC)
 '''
 process.load('HeavyIonsAnalysis.ZDCAnalysis.ZDCAnalyzersHC2023_cff')
 process.zdcanalyzer.doZDCRecHit = False
@@ -123,11 +117,7 @@ process.es_prefer_flatparms = cms.ESPrefer('PoolDBESSource','')
 process.evtplane_seq = cms.Sequence(process.hiEvtPlane * process.hiEvtPlaneFlat)
 
 
-
-#from VertexCompositeAnalysis.VertexCompositeProducer.PATAlgos_cff import changeToMiniAOD
-
 # Define the analysis steps
-
 VertexCollection_PAT = "offlineSlimmedPrimaryVertices"
 TrackCollection_PAT = "packedPFCandidates"
 GenParticleCollection_PAT = "prunedGenParticles"
@@ -217,6 +207,7 @@ process.schedule = cms.Schedule(process.Ana_seq)
 process.options.numberOfThreads = 2
 
 '''
+#skim edms is not required for MC
 process.output = cms.OutputModule("PoolOutputModule",
     fileName = cms.untracked.string('edm_D0_mc.root'),
         outputCommands = cms.untracked.vstring( #which data to include and exclude 
