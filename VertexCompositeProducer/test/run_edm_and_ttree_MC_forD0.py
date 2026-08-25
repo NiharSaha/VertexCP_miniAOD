@@ -98,7 +98,7 @@ process.hiEvtPlane.trackTag = cms.InputTag("packedPFCandidates")
 process.hiEvtPlane.vertexTag = cms.InputTag("offlineSlimmedPrimaryVertices")
 process.hiEvtPlaneFlat.vertexTag = cms.InputTag("offlineSlimmedPrimaryVertices")
 
-process.hiEvtPlane.loadDB = cms.bool(True)
+process.hiEvtPlane.loadDB = cms.bool(False) # Not calibrated!!
 process.hiEvtPlaneFlat.centralityVariable=process.hiEvtPlane.centralityVariable
 process.hiEvtPlaneFlat.vertexTag=process.hiEvtPlane.vertexTag
 process.hiEvtPlaneFlat.flatminvtx=process.hiEvtPlane.flatminvtx
@@ -109,7 +109,7 @@ process.hiEvtPlaneFlat.CentBinCompression=process.hiEvtPlane.CentBinCompression
 process.hiEvtPlaneFlat.caloCentRef=process.hiEvtPlane.caloCentRef
 process.hiEvtPlaneFlat.caloCentRefWidth=process.hiEvtPlane.caloCentRefWidth
 
-
+'''
 process.CondDB.connect = "sqlite_file:HeavyIonRPRcd_offline_PbPb2023_wEra.db"
 process.PoolDBESSource = cms.ESSource("PoolDBESSource",
                                       process.CondDB,
@@ -119,6 +119,7 @@ process.PoolDBESSource = cms.ESSource("PoolDBESSource",
                                     )
 )
 process.es_prefer_flatparms = cms.ESPrefer('PoolDBESSource','')
+'''
 process.evtplane_seq = cms.Sequence(process.hiEvtPlane * process.hiEvtPlaneFlat)
 
 
