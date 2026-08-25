@@ -213,7 +213,7 @@ process.Ana_seq = cms.Path(
 
 process.schedule = cms.Schedule(process.Ana_seq)
 
-process.options.numberOfThreads = 1
+process.options.numberOfThreads = 2
 
 '''
 process.output = cms.OutputModule("PoolOutputModule",

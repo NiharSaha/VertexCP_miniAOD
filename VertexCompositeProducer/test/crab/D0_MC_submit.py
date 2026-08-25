@@ -19,8 +19,8 @@ config.General.transferLogs = True
 
 config.JobType.pluginName = 'Analysis'
 config.JobType.psetName = '../run_edm_and_ttree_MC_forD0.py'
-#config.JobType.numCores = 2                                                                                                                           
-#config.JobType.maxMemoryMB = 4000                                                                                                                     
+config.JobType.numCores = 2                                                                                                                           
+config.JobType.maxMemoryMB = 4000                                                                                                                     
 config.JobType.allowUndistributedCMSSW = True
 config.JobType.inputFiles = ['../HeavyIonRPRcd_offline_PbPb2023_wEra.db']
 
