@@ -180,8 +180,8 @@ process.d0Analyzer.centralitySrc = cms.InputTag("hiCentrality") #central
 process.d0Analyzer.doGenNtuple = cms.untracked.bool(True) #MConly
 process.d0Analyzer.doGenMatching = cms.untracked.bool(True) #MConly
 process.d0Analyzer.useAnyMVA = cms.bool(True); #only set true if you are assigning BDT values +++ change  
-process.d0Analyzer.MVACollection = cms.InputTag("d0Selector:MVAValuesD0:ANASKIM")
-process.d0Analyzer.MVACollection2 = cms.InputTag("d0Selector:MVAValuesD02:ANASKIM")
+process.d0Analyzer.MVACollection = cms.InputTag("d0Selector:MVAValuesNewD0:ANASKIM")
+process.d0Analyzer.MVACollection2 = cms.InputTag("d0Selector:MVAValuesNewD02:ANASKIM")
 process.d0Analyzer.ip_tree = cms.bool(False)
 
 

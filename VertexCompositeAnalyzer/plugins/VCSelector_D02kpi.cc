@@ -933,10 +933,11 @@ void VCSelector_D02kpi::fillRECO(edm::Event &iEvent, const edm::EventSetup &iSet
 			mva_value = mva->GetMvaValue(inputValues);
 			bdt_cut_value = bdt->getBDTCut(y, centrality, pt);
 
-
-			if (mva_value <= bdt_cut_value && onnxVal <= mvaCut_)
-				continue;
-
+			//// apply MVA cut only for data, not for MC
+			if (iEvent.isRealData()){
+			  if (mva_value <= bdt_cut_value && onnxVal <= mvaCut_) continue;
+			}
+			
 			theMVANew.push_back(mva_value);
 			theMVANew_xg.push_back(onnxVal);
 		}
