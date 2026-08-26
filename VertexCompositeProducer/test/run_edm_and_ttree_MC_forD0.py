@@ -18,11 +18,11 @@ process.load('HeavyIonsAnalysis.EventAnalysis.hltobject_cfi')
 # Limit the output messages
 process.load('FWCore.MessageService.MessageLogger_cfi')
 
-process.MessageLogger.cerr.FwkReport.reportEvery = 1000
+process.MessageLogger.cerr.FwkReport.reportEvery = 10
 
 process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
 
-process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32((-1))) 
+process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32((100))) 
 process.TFileService = cms.Service("TFileService",
     fileName =cms.string('TTree_D0_MC.root'))
 
@@ -161,10 +161,11 @@ process.d0Selector.trkNHitMin = cms.untracked.int32(11)
 process.d0Selector.D0 = cms.InputTag("generalD0CandidatesNew:D0")
 process.d0Selector.input_names = cms.vstring('input')
 process.d0Selector.output_names = cms.vstring('probabilities')
+process.d0Selector.bdtCutsFile = cms.string("bdt_cuts.csv")
 process.d0Selector.onnxModelFileName = cms.string("XGBoost_Model_0428_0_OnlyPrompt.onnx")
 process.d0Selector.mvaCut = cms.double(0.4)
 process.d0Selector.isCentrality = cms.bool(True) # Centrality 
-process.d0Selector.useAnyMVA = cms.bool(False); #only set true if you are assigning BDT values  +++change 
+process.d0Selector.useAnyMVA = cms.bool(True); #only set true if you are assigning BDT values  +++change 
 
 
 process.d0Analyzer = process.d0ana.clone()
@@ -178,7 +179,7 @@ process.d0Analyzer.centralityBinLabel = cms.InputTag("centralityBin", "HFtowers"
 process.d0Analyzer.centralitySrc = cms.InputTag("hiCentrality") #central
 process.d0Analyzer.doGenNtuple = cms.untracked.bool(True) #MConly
 process.d0Analyzer.doGenMatching = cms.untracked.bool(True) #MConly
-process.d0Analyzer.useAnyMVA = cms.bool(False); #only set true if you are assigning BDT values +++ change  
+process.d0Analyzer.useAnyMVA = cms.bool(True); #only set true if you are assigning BDT values +++ change  
 process.d0Analyzer.MVACollection = cms.InputTag("d0Selector:MVAValuesD0:ANASKIM")
 process.d0Analyzer.MVACollection2 = cms.InputTag("d0Selector:MVAValuesD02:ANASKIM")
 process.d0Analyzer.ip_tree = cms.bool(False)
