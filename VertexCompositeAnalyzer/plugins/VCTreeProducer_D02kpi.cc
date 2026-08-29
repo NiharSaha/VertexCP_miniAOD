@@ -211,6 +211,8 @@ private:
 	std::vector<float> gen_dl2D;
 	std::vector<float> twoTrackDCA;
 
+	std::vector<int> genMatchIdx;
+
 	// dau info
 	std::vector<float> dzos1;
 	std::vector<float> dzos2;
@@ -265,12 +267,14 @@ private:
 
 	std::vector<int> genD0_centrality;
 	std::vector<int> genD0_PdgID;
+	std::vector<int> genD0_firstRealMotherPdgID;
+	std::vector<bool> genD0_hasBottomAncestor;
 	std::vector<float> genD0_pt;
 	std::vector<float> genD0_eta;
 	std::vector<float> genD0_phi;
 	std::vector<float> genD0_y;
 	std::vector<float> genD0_mass;
-	
+
 	int N_genD0s;
 
 	std::vector<float> DgenprodvtxX;
@@ -344,6 +348,7 @@ private:
 		f(gen_dl);
 		f(gen_dl2D);
 		f(twoTrackDCA);
+		f(genMatchIdx);
 
 		f(dzos1);
 		f(dzos2);
@@ -582,6 +587,8 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 	// clear previous event data
 	genD0_centrality.clear();
 	genD0_PdgID.clear();
+	genD0_firstRealMotherPdgID.clear();
+	genD0_hasBottomAncestor.clear();
 	genD0_pt.clear();
 	genD0_eta.clear();
 	genD0_phi.clear();
@@ -596,7 +603,8 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 
 	N_genD0s = 0;
 
-	if (!genpars.isValid()) return;
+	if (!genpars.isValid())
+		return;
 
 	for (unsigned genPair = 0; genPair < genpars->size(); ++genPair)
 	{ // loop over all gen particles ->known D0 to kPi pairs
@@ -618,6 +626,43 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 		genD0_centrality.push_back(centrality); // This will save centrality for each gen D0
 		int motherId = genD0.mother() ? genD0.mother()->pdgId() : 0;
 		genD0_PdgID.push_back(motherId);
+
+		int firstRealMotherId = 0;
+		bool foundFirstRealMother = false;
+		bool bottomAncestor = false;
+		{
+			const reco::Candidate *cur = &genD0;
+			int nSteps = 0;
+			const int maxSteps = 50; // guard against malformed/circular gen history
+
+			while (cur && cur->numberOfMothers() > 0 && nSteps < maxSteps)
+			{
+				const reco::Candidate *mom = cur->mother(0);
+				if (!mom)
+					break;
+
+				int momId = mom->pdgId();
+				int absId = std::abs(momId);
+
+				if (!foundFirstRealMother && absId != std::abs(genD0.pdgId()))
+				{
+					firstRealMotherId = momId;
+					foundFirstRealMother = true;
+				}
+
+				if ((absId / 100) % 10 == 5 || (absId / 1000) % 10 == 5)
+				{
+					bottomAncestor = true;
+					break;
+				}
+
+				cur = mom;
+				nSteps++;
+			}
+		}
+		genD0_firstRealMotherPdgID.push_back(firstRealMotherId);
+		genD0_hasBottomAncestor.push_back(bottomAncestor);
+
 		genD0_pt.push_back(genD0.pt());
 		genD0_eta.push_back(genD0.eta());
 		genD0_phi.push_back(genD0.phi());
@@ -889,6 +934,8 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 
 			matchGEN[it] = false;
 			isSwap[it] = false;
+
+			genMatchIdx[it] = -1;
 			idmom_reco[it] = -77;
 			idd1_reco[it] = -77;
 			idd2_reco[it] = -77;
@@ -910,6 +957,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 					return;
 				}
 
+				int valid_gen_d0_count = 0;
 				for (unsigned genPair = 0; genPair < genpars->size(); ++genPair)
 				{ // loop over all gen particles ->known D0 to kPi pairs
 
@@ -924,6 +972,11 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 
 					if (!(fabs(gen_d1->pdgId()) == PID_dau1_ && fabs(gen_d2->pdgId()) == PID_dau2_) && !(fabs(gen_d2->pdgId()) == PID_dau1_ && fabs(gen_d1->pdgId()) == PID_dau2_))
 						continue; // make sure k pi pairs
+
+					// If it passed the checks above, it means this D0 was saved to ntGen.
+					// Grab the current index, then increment the counter for the next loop.
+					int current_ntGen_index = valid_gen_d0_count;
+					valid_gen_d0_count++;
 
 					if (((reco_d1_charge == gen_d1->charge() && reco_d2_charge == gen_d2->charge()) || (reco_d1_charge == gen_d2->charge() && reco_d2_charge == gen_d1->charge())))
 					{
@@ -943,6 +996,8 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 								continue; // check deltaPt matching
 
 							matchGEN[it] = true; // matched gen
+							genMatchIdx[it] = current_ntGen_index;
+
 							if (reco_d1->pdgId() != gen_d1->pdgId())
 								isSwap[it] = true;
 							genDecayLength(it, genD0);
@@ -952,7 +1007,8 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 							y_gen[it] = genD0.rapidity();
 							phi_gen[it] = genD0.phi();
 
-							idmom[it] = genD0.pdgId();
+							// idmom[it] = genD0.pdgId();
+							idmom[it] = genD0.mother() ? genD0.mother()->pdgId() : 0;
 
 							if (!decayInGen_)
 								continue;
@@ -978,6 +1034,8 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 								continue; // check deltaPt matching
 
 							matchGEN[it] = true; // matched gen
+							genMatchIdx[it] = current_ntGen_index;
+
 							if (reco_d1->pdgId() != gen_d2->pdgId())
 								isSwap[it] = true;
 							genDecayLength(it, genD0);
@@ -987,7 +1045,8 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 							y_gen[it] = genD0.rapidity();
 							phi_gen[it] = genD0.phi();
 
-							idmom[it] = genD0.pdgId();
+							// idmom[it] = genD0.pdgId();
+							idmom[it] = genD0.mother() ? genD0.mother()->pdgId() : 0;
 
 							if (!decayInGen_)
 								continue;
@@ -1052,8 +1111,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 
 			agl_abs[it] = secvec.Angle(ptosvec);
 			agl2D_abs[it] = secvec2D.Angle(ptosvec2D);
-	
-			
+
 			float r2lxyBS = (secvx - BSx - (secvz - BSz) * BSdxdz) * (secvx - BSx - (secvz - BSz) * BSdxdz) + (secvy - BSy - (secvz - BSz) * BSdydz) * (secvy - BSy - (secvz - BSz) * BSdydz);
 			xlxyBS = secvx - BSx - (secvz - BSz) * BSdxdz;
 			ylxyBS = secvy - BSy - (secvz - BSz) * BSdydz;
@@ -1250,6 +1308,7 @@ void VCTreeProducer_D02kpi::initTree()
 
 			if (doGenMatching_)
 			{
+				VertexCompositeNtuple->Branch("genMatchIdx", &genMatchIdx);
 				VertexCompositeNtuple->Branch("isSwap", &isSwap);
 				VertexCompositeNtuple->Branch("idmom_reco", &idmom_reco);
 				VertexCompositeNtuple->Branch("idD1_reco", &idd1_reco);
@@ -1286,6 +1345,8 @@ void VCTreeProducer_D02kpi::initTree()
 		AllGensNtuple->Branch("N_genD0s", &N_genD0s, "N_genD0s/I");
 		AllGensNtuple->Branch("genD0_centrality", &genD0_centrality);
 		AllGensNtuple->Branch("genD0_MotherPdgID", &genD0_PdgID);
+		AllGensNtuple->Branch("genD0_firstRealMotherPdgID", &genD0_firstRealMotherPdgID);
+		AllGensNtuple->Branch("genD0_hasBottomAncestor", &genD0_hasBottomAncestor);
 		AllGensNtuple->Branch("genD0_pt", &genD0_pt);
 		AllGensNtuple->Branch("genD0_eta", &genD0_eta);
 		AllGensNtuple->Branch("genD0_phi", &genD0_phi);
