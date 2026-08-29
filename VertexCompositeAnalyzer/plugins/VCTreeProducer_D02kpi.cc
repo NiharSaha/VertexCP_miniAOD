@@ -284,6 +284,11 @@ private:
 	std::vector<float> DgendecayvtxY;
 	std::vector<float> DgendecayvtxZ;
 
+	std::vector<float> genD0_decayLength3D;
+	std::vector<float> genD0_decayLength2D;
+	std::vector<float> genD0_pointingAngle3D;
+	std::vector<float> genD0_pointingAngle2D;
+
 	edm::Handle<int> cbin_;
 
 	// tokens
@@ -558,6 +563,14 @@ void VCTreeProducer_D02kpi::analyze(const edm::Event &iEvent, const edm::EventSe
 	using namespace edm;
 	using namespace reco;
 
+	centrality = -1;
+	if (isCentrality_)
+	{
+		edm::Handle<int> cbin;
+		iEvent.getByToken(tok_centBinLabel_, cbin);
+		centrality = (cbin.isValid() ? *cbin : -1);
+	}
+
 	if (doGenMatching_ || doGenNtuple_)
 	{
 		saveAllGens(iEvent, iSetup);
@@ -601,6 +614,11 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 	DgendecayvtxY.clear();
 	DgendecayvtxZ.clear();
 
+	genD0_decayLength3D.clear();
+	genD0_decayLength2D.clear();
+	genD0_pointingAngle3D.clear();
+	genD0_pointingAngle2D.clear();
+
 	N_genD0s = 0;
 
 	if (!genpars.isValid())
@@ -610,7 +628,7 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 	{ // loop over all gen particles ->known D0 to kPi pairs
 
 		const reco::GenParticle &genD0 = (*genpars)[genPair];
-		if (std::abs(genD0.pdgId()) != 421)
+		if (std::abs(genD0.pdgId()) != PID_)
 			continue;
 		if (genD0.numberOfDaughters() != 2)
 			continue;
@@ -672,18 +690,35 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 		DgenprodvtxX.push_back(genD0.vx());
 		DgenprodvtxY.push_back(genD0.vy());
 		DgenprodvtxZ.push_back(genD0.vz());
-		if (genD0.numberOfDaughters() == 2 && genD0.daughter(0)->vertex().Rho() > -1)
+		if (genD0.numberOfDaughters() == 2 && genD0.daughter(0))
 		{
-			auto dv = genD0.daughter(0)->vertex();
+			const auto dv = genD0.daughter(0)->vertex();
 			DgendecayvtxX.push_back(dv.X());
 			DgendecayvtxY.push_back(dv.Y());
 			DgendecayvtxZ.push_back(dv.Z());
+
+			const double dx = dv.X() - genD0.vx();
+			const double dy = dv.Y() - genD0.vy();
+			const double dz = dv.Z() - genD0.vz();
+			TVector3 flight(dx, dy, dz);
+			TVector3 flight2D(dx, dy, 0.0);
+			TVector3 mom(genD0.px(), genD0.py(), genD0.pz());
+			TVector3 mom2D(genD0.px(), genD0.py(), 0.0);
+
+			genD0_decayLength3D.push_back(flight.Mag());
+			genD0_decayLength2D.push_back(flight2D.Mag());
+			genD0_pointingAngle3D.push_back(mom.Angle(flight));
+			genD0_pointingAngle2D.push_back(mom2D.Angle(flight2D));
 		}
 		else
 		{
 			DgendecayvtxX.push_back(-999.);
 			DgendecayvtxY.push_back(-999.);
 			DgendecayvtxZ.push_back(-999.);
+			genD0_decayLength3D.push_back(-999.);
+			genD0_decayLength2D.push_back(-999.);
+			genD0_pointingAngle3D.push_back(-999.);
+			genD0_pointingAngle2D.push_back(-999.);
 		}
 		N_genD0s++;
 	}
@@ -966,9 +1001,14 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 					int id = genD0.pdgId();
 					if (fabs(id) != PID_)
 						continue; // check to make sure is D0
+					if (genD0.numberOfDaughters() != 2)
+						continue;
 
 					const reco::Candidate *gen_d1 = genD0.daughter(0);
 					const reco::Candidate *gen_d2 = genD0.daughter(1);
+
+					if (!gen_d1 || !gen_d2)
+						continue;
 
 					if (!(fabs(gen_d1->pdgId()) == PID_dau1_ && fabs(gen_d2->pdgId()) == PID_dau2_) && !(fabs(gen_d2->pdgId()) == PID_dau1_ && fabs(gen_d1->pdgId()) == PID_dau2_))
 						continue; // make sure k pi pairs
@@ -1359,6 +1399,11 @@ void VCTreeProducer_D02kpi::initTree()
 		AllGensNtuple->Branch("DgendecayvtxX", &DgendecayvtxX);
 		AllGensNtuple->Branch("DgendecayvtxY", &DgendecayvtxY);
 		AllGensNtuple->Branch("DgendecayvtxZ", &DgendecayvtxZ);
+
+		AllGensNtuple->Branch("genD0_decayLength3D", &genD0_decayLength3D);
+		AllGensNtuple->Branch("genD0_decayLength2D", &genD0_decayLength2D);
+		AllGensNtuple->Branch("genD0_pointingAngle3D", &genD0_pointingAngle3D);
+		AllGensNtuple->Branch("genD0_pointingAngle2D", &genD0_pointingAngle2D);
 	}
 }
 
@@ -1376,16 +1421,26 @@ void VCTreeProducer_D02kpi::genDecayLength(const uint &it, const reco::GenPartic
 	gen_agl2D_abs[it] = -99.;
 	if (gCand.numberOfDaughters() == 0 || !gCand.daughter(0))
 		return;
-	const auto &dauVtx = gCand.daughter(0)->vertex();
-	TVector3 ptosvec(dauVtx.X(), dauVtx.Y(), dauVtx.Z());
+
+	// D0 flight vector = (decay vertex) - (production vertex).
+	// daughter(0)->vertex() is the daughter's production vertex, i.e. the D0 decay vertex.
+	// gCand.vertex() is the D0 production vertex (== primary vertex for prompt D0,== B-decay vertex for non-prompt D0).
+	const auto &decayVtx = gCand.daughter(0)->vertex();
+	const double dx = decayVtx.X() - gCand.vx();
+	const double dy = decayVtx.Y() - gCand.vy();
+	const double dz = decayVtx.Z() - gCand.vz();
+
+	TVector3 ptosvec(dx, dy, dz);
 	TVector3 secvec(gCand.px(), gCand.py(), gCand.pz());
 	gen_agl_abs[it] = secvec.Angle(ptosvec);
 	gen_dl[it] = ptosvec.Mag();
-	TVector3 ptosvec2D(dauVtx.X(), dauVtx.Y(), 0.0);
+
+	TVector3 ptosvec2D(dx, dy, 0.0);
 	TVector3 secvec2D(gCand.px(), gCand.py(), 0.0);
 	gen_agl2D_abs[it] = secvec2D.Angle(ptosvec2D);
 	gen_dl2D[it] = ptosvec2D.Mag();
 }
+
 
 // define this as a plug-in
 DEFINE_FWK_MODULE(VCTreeProducer_D02kpi);

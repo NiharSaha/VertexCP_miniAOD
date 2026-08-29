@@ -18,11 +18,11 @@ process.load('HeavyIonsAnalysis.EventAnalysis.hltobject_cfi')
 # Limit the output messages
 process.load('FWCore.MessageService.MessageLogger_cfi')
 
-process.MessageLogger.cerr.FwkReport.reportEvery = 10
+process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 
 process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
 
-process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32((100))) 
+process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32((-1))) 
 process.TFileService = cms.Service("TFileService",
     fileName =cms.string('TTree_D0_MC.root'))
 
@@ -188,8 +188,8 @@ process.d0Analyzer.ip_tree = cms.bool(False)
 process.d0ana_seq2 = cms.Sequence(process.d0Selector * process.d0Analyzer)
 
 process.eventinfoana = process.eventinfoana.clone()
-process.eventinfoana.stageL1Trigger = cms.uint32(2)
 process.eventinfoana.VertexCollection = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.eventinfoana.isMC = cms.bool(True)
 
 process.EventInfoAnalysis = cms.Sequence(process.eventinfoana)
 
