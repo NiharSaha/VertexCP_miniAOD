@@ -123,6 +123,16 @@ private:
 	virtual void initTree();
 	void genDecayLength(const uint &, const reco::GenParticle &);
 
+	// Result of a single walk up the gen mother chain: avoids duplicating the
+	// ancestry walk once for bottom-tagging and again for the primary-vertex lookup.
+	struct GenAncestryInfo
+	{
+		int firstRealMotherPdgId = 0;
+		bool hasBottomAncestor = false;
+		math::XYZPoint primaryVertex; // b-hadron production point if hasBottomAncestor, else genD0.vertex()
+	};
+	GenAncestryInfo walkGenAncestry(const reco::GenParticle &) const;
+
 	// ----------member data ---------------------------
 
 	edm::Service<TFileService> fs;
@@ -284,10 +294,16 @@ private:
 	std::vector<float> DgendecayvtxY;
 	std::vector<float> DgendecayvtxZ;
 
+	// D0 flight measured from D0 decay vertex!
 	std::vector<float> genD0_decayLength3D;
 	std::vector<float> genD0_decayLength2D;
 	std::vector<float> genD0_pointingAngle3D;
 	std::vector<float> genD0_pointingAngle2D;
+
+	// D0 flight measured from PV
+	std::vector<float> genD0_decayLengthFromPV3D;
+	std::vector<float> genD0_pointingAngleFromPV3D;
+	std::vector<float> genD0_dcaFromPV3D;
 
 	edm::Handle<int> cbin_;
 
@@ -619,6 +635,10 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 	genD0_pointingAngle3D.clear();
 	genD0_pointingAngle2D.clear();
 
+	genD0_decayLengthFromPV3D.clear();
+	genD0_pointingAngleFromPV3D.clear();
+	genD0_dcaFromPV3D.clear();
+
 	N_genD0s = 0;
 
 	if (!genpars.isValid())
@@ -645,41 +665,10 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 		int motherId = genD0.mother() ? genD0.mother()->pdgId() : 0;
 		genD0_PdgID.push_back(motherId);
 
-		int firstRealMotherId = 0;
-		bool foundFirstRealMother = false;
-		bool bottomAncestor = false;
-		{
-			const reco::Candidate *cur = &genD0;
-			int nSteps = 0;
-			const int maxSteps = 50; // guard against malformed/circular gen history
-
-			while (cur && cur->numberOfMothers() > 0 && nSteps < maxSteps)
-			{
-				const reco::Candidate *mom = cur->mother(0);
-				if (!mom)
-					break;
-
-				int momId = mom->pdgId();
-				int absId = std::abs(momId);
-
-				if (!foundFirstRealMother && absId != std::abs(genD0.pdgId()))
-				{
-					firstRealMotherId = momId;
-					foundFirstRealMother = true;
-				}
-
-				if ((absId / 100) % 10 == 5 || (absId / 1000) % 10 == 5)
-				{
-					bottomAncestor = true;
-					break;
-				}
-
-				cur = mom;
-				nSteps++;
-			}
-		}
-		genD0_firstRealMotherPdgID.push_back(firstRealMotherId);
-		genD0_hasBottomAncestor.push_back(bottomAncestor);
+		//save ancestry information!
+		const GenAncestryInfo ancestry = walkGenAncestry(genD0);
+		genD0_firstRealMotherPdgID.push_back(ancestry.firstRealMotherPdgId);
+		genD0_hasBottomAncestor.push_back(ancestry.hasBottomAncestor);
 
 		genD0_pt.push_back(genD0.pt());
 		genD0_eta.push_back(genD0.eta());
@@ -709,6 +698,15 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 			genD0_decayLength2D.push_back(flight2D.Mag());
 			genD0_pointingAngle3D.push_back(mom.Angle(flight));
 			genD0_pointingAngle2D.push_back(mom2D.Angle(flight2D));
+
+			// Same flight vector, but measured from the true primary vertex
+			const math::XYZPoint &pvGen = ancestry.primaryVertex;
+			TVector3 flightPV(dv.X() - pvGen.X(), dv.Y() - pvGen.Y(), dv.Z() - pvGen.Z());
+			const double dlPV = flightPV.Mag();
+			const double aglPV = mom.Angle(flightPV);
+			genD0_decayLengthFromPV3D.push_back(dlPV);
+			genD0_pointingAngleFromPV3D.push_back(aglPV);
+			genD0_dcaFromPV3D.push_back(dlPV * std::sin(aglPV));
 		}
 		else
 		{
@@ -719,6 +717,9 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 			genD0_decayLength2D.push_back(-999.);
 			genD0_pointingAngle3D.push_back(-999.);
 			genD0_pointingAngle2D.push_back(-999.);
+			genD0_decayLengthFromPV3D.push_back(-999.);
+			genD0_pointingAngleFromPV3D.push_back(-999.);
+			genD0_dcaFromPV3D.push_back(-999.);
 		}
 		N_genD0s++;
 	}
@@ -1404,6 +1405,10 @@ void VCTreeProducer_D02kpi::initTree()
 		AllGensNtuple->Branch("genD0_decayLength2D", &genD0_decayLength2D);
 		AllGensNtuple->Branch("genD0_pointingAngle3D", &genD0_pointingAngle3D);
 		AllGensNtuple->Branch("genD0_pointingAngle2D", &genD0_pointingAngle2D);
+
+		AllGensNtuple->Branch("genD0_decayLengthFromPV3D", &genD0_decayLengthFromPV3D);
+		AllGensNtuple->Branch("genD0_pointingAngleFromPV3D", &genD0_pointingAngleFromPV3D);
+		AllGensNtuple->Branch("genD0_dcaFromPV3D", &genD0_dcaFromPV3D);
 	}
 }
 
@@ -1411,6 +1416,45 @@ void VCTreeProducer_D02kpi::initTree()
 // loop  ------------
 void VCTreeProducer_D02kpi::endJob()
 {
+}
+
+// Single walk up the gen mother chain: tags whether genD0 descends from a b hadron
+// (used for prompt/non-prompt classification) and, in the same pass, resolves the
+// true primary-vertex position (the b-hadron's production point for non-prompt D0s,
+// or the D0's own production vertex -- already at the PV -- for prompt D0s).
+VCTreeProducer_D02kpi::GenAncestryInfo VCTreeProducer_D02kpi::walkGenAncestry(const reco::GenParticle &genD0) const
+{
+	GenAncestryInfo info;
+	info.primaryVertex = genD0.vertex();
+
+	const reco::Candidate *cur = &genD0;
+	bool foundFirstRealMother = false;
+	const int maxSteps = 50; // guard against malformed/circular gen history
+	for (int nSteps = 0; cur && cur->numberOfMothers() > 0 && nSteps < maxSteps; ++nSteps)
+	{
+		const reco::Candidate *mom = cur->mother(0);
+		if (!mom)
+			break;
+
+		const int momId = mom->pdgId();
+		const int absId = std::abs(momId);
+
+		if (!foundFirstRealMother && absId != std::abs(genD0.pdgId()))
+		{
+			info.firstRealMotherPdgId = momId;
+			foundFirstRealMother = true;
+		}
+
+		if ((absId / 100) % 10 == 5 || (absId / 1000) % 10 == 5)
+		{
+			info.hasBottomAncestor = true;
+			info.primaryVertex = mom->vertex(); // b-hadron production point ~= true primary vertex
+			break;
+		}
+
+		cur = mom;
+	}
+	return info;
 }
 
 void VCTreeProducer_D02kpi::genDecayLength(const uint &it, const reco::GenParticle &gCand)
@@ -1422,20 +1466,14 @@ void VCTreeProducer_D02kpi::genDecayLength(const uint &it, const reco::GenPartic
 	if (gCand.numberOfDaughters() == 0 || !gCand.daughter(0))
 		return;
 
-	// D0 flight vector = (decay vertex) - (production vertex).
-	// daughter(0)->vertex() is the daughter's production vertex, i.e. the D0 decay vertex.
-	// gCand.vertex() is the D0 production vertex (== primary vertex for prompt D0,== B-decay vertex for non-prompt D0).
-	const auto &decayVtx = gCand.daughter(0)->vertex();
-	const double dx = decayVtx.X() - gCand.vx();
-	const double dy = decayVtx.Y() - gCand.vy();
-	const double dz = decayVtx.Z() - gCand.vz();
+	const auto &dauVtx = gCand.daughter(0)->vertex();
+	TVector3 ptosvec(dauVtx.X(), dauVtx.Y(), dauVtx.Z());
 
-	TVector3 ptosvec(dx, dy, dz);
 	TVector3 secvec(gCand.px(), gCand.py(), gCand.pz());
 	gen_agl_abs[it] = secvec.Angle(ptosvec);
 	gen_dl[it] = ptosvec.Mag();
+	TVector3 ptosvec2D(dauVtx.X(), dauVtx.Y(), 0.0);
 
-	TVector3 ptosvec2D(dx, dy, 0.0);
 	TVector3 secvec2D(gCand.px(), gCand.py(), 0.0);
 	gen_agl2D_abs[it] = secvec2D.Angle(ptosvec2D);
 	gen_dl2D[it] = ptosvec2D.Mag();
