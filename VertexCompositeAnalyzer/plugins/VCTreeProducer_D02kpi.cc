@@ -54,6 +54,7 @@
 #include "DataFormats/Candidate/interface/Candidate.h"
 #include "DataFormats/Candidate/interface/VertexCompositeCandidate.h"
 #include "DataFormats/Candidate/interface/VertexCompositeCandidateFwd.h"
+#include "DataFormats/Math/interface/Point3D.h"
 
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
@@ -123,13 +124,11 @@ private:
 	virtual void initTree();
 	void genDecayLength(const uint &, const reco::GenParticle &);
 
-	// Result of a single walk up the gen mother chain: avoids duplicating the
-	// ancestry walk once for bottom-tagging and again for the primary-vertex lookup.
+	// Result of a walk up the gen mother chain, used to classify a gen D0 as prompt/non-prompt 
 	struct GenAncestryInfo
 	{
 		int firstRealMotherPdgId = 0;
 		bool hasBottomAncestor = false;
-		math::XYZPoint primaryVertex; // b-hadron production point if hasBottomAncestor, else genD0.vertex()
 	};
 	GenAncestryInfo walkGenAncestry(const reco::GenParticle &) const;
 
@@ -318,6 +317,9 @@ private:
 	edm::EDGetTokenT<edm::ValueMap<reco::DeDxData>> Dedx_Token1_;
 	edm::EDGetTokenT<edm::ValueMap<reco::DeDxData>> Dedx_Token2_;
 	edm::EDGetTokenT<reco::GenParticleCollection> tok_genParticle_;
+	// True primary/interaction vertex, as computed by GenParticleProducer from the
+	// smeared HepMC event (genParticles:xyz0) -- one value per event
+	edm::EDGetTokenT<math::XYZPointF> tok_genVertex_;
 
 	edm::EDGetTokenT<int> tok_centBinLabel_;
 	edm::EDGetTokenT<reco::Centrality> tok_centSrc_;
@@ -543,6 +545,8 @@ VCTreeProducer_D02kpi::VCTreeProducer_D02kpi(const edm::ParameterSet &iConfig) :
 	Dedx_Token1_ = consumes<edm::ValueMap<reco::DeDxData>>(edm::InputTag("dedxHarmonic2"));
 	Dedx_Token2_ = consumes<edm::ValueMap<reco::DeDxData>>(edm::InputTag("dedxTruncated40"));
 	tok_genParticle_ = consumes<reco::GenParticleCollection>(edm::InputTag(iConfig.getUntrackedParameter<edm::InputTag>("GenParticleCollection")));
+	tok_genVertex_ = consumes<math::XYZPointF>(
+		iConfig.getUntrackedParameter<edm::InputTag>("genVertexCollection", edm::InputTag("genParticles", "xyz0")));
 	bsLabel_ = consumes<reco::BeamSpot>(iConfig.getParameter<edm::InputTag>("BSLabel"));
 
 	if (isCentrality_)
@@ -612,6 +616,15 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 	edm::Handle<reco::GenParticleCollection> genpars;
 	if (doGenMatching_ || doGenNtuple_)
 		iEvent.getByToken(tok_genParticle_, genpars);
+
+	// True primary vertex for this event (genParticles:xyz0), used as the reference
+	// point for every gen D0's PV-referenced decay length/pointing angle/DCA below.
+	// Falls back to the origin if the product isn't available.
+	edm::Handle<math::XYZPointF> genVtxHandle;
+	iEvent.getByToken(tok_genVertex_, genVtxHandle);
+	math::XYZPoint truePV(0., 0., 0.);
+	if (genVtxHandle.isValid())
+		truePV = math::XYZPoint(genVtxHandle->X(), genVtxHandle->Y(), genVtxHandle->Z());
 
 	// clear previous event data
 	genD0_centrality.clear();
@@ -699,9 +712,8 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 			genD0_pointingAngle3D.push_back(mom.Angle(flight));
 			genD0_pointingAngle2D.push_back(mom2D.Angle(flight2D));
 
-			// Same flight vector, but measured from the true primary vertex
-			const math::XYZPoint &pvGen = ancestry.primaryVertex;
-			TVector3 flightPV(dv.X() - pvGen.X(), dv.Y() - pvGen.Y(), dv.Z() - pvGen.Z());
+			// Same flight vector, but measured from the true primary vertex (genParticles:xyz0)
+			TVector3 flightPV(dv.X() - truePV.X(), dv.Y() - truePV.Y(), dv.Z() - truePV.Z());
 			const double dlPV = flightPV.Mag();
 			const double aglPV = mom.Angle(flightPV);
 			genD0_decayLengthFromPV3D.push_back(dlPV);
@@ -1419,20 +1431,17 @@ void VCTreeProducer_D02kpi::endJob()
 }
 
 // Single walk up the gen mother chain: tags whether genD0 descends from a b hadron
-// (used for prompt/non-prompt classification) and, in the same pass, resolves the
-// true primary-vertex position (the b-hadron's production point for non-prompt D0s,
-// or the D0's own production vertex -- already at the PV -- for prompt D0s).
+// and records the first ancestor with a different pdgId, for prompt/non-prompt classification.
 VCTreeProducer_D02kpi::GenAncestryInfo VCTreeProducer_D02kpi::walkGenAncestry(const reco::GenParticle &genD0) const
 {
 	GenAncestryInfo info;
-	info.primaryVertex = genD0.vertex();
 
 	const reco::Candidate *cur = &genD0;
 	bool foundFirstRealMother = false;
-	const int maxSteps = 50; // guard against malformed/circular gen history
+	const int maxSteps = 50;
 	for (int nSteps = 0; cur && cur->numberOfMothers() > 0 && nSteps < maxSteps; ++nSteps)
 	{
-		const reco::Candidate *mom = cur->mother(0);
+		const reco::Candidate *mom = cur->mother();
 		if (!mom)
 			break;
 
@@ -1448,7 +1457,6 @@ VCTreeProducer_D02kpi::GenAncestryInfo VCTreeProducer_D02kpi::walkGenAncestry(co
 		if ((absId / 100) % 10 == 5 || (absId / 1000) % 10 == 5)
 		{
 			info.hasBottomAncestor = true;
-			info.primaryVertex = mom->vertex(); // b-hadron production point ~= true primary vertex
 			break;
 		}
 
