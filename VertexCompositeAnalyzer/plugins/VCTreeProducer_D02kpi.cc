@@ -268,8 +268,15 @@ private:
 	std::vector<float> phi_gen;
 	std::vector<int> iddau1;
 	std::vector<int> iddau2;
-	std::vector<int> genD0_firstRealMotherPdgID;
-	std::vector<int> genD0_isPrompt;
+	std::vector<int> Dgen_firstRealMotherPdgID;
+	std::vector<int> Dgen_isPrompt;
+
+	std::vector<float> DgenprodvtxX;
+	std::vector<float> DgenprodvtxY;
+	std::vector<float> DgenprodvtxZ;
+	std::vector<float> DgendecayvtxX;
+	std::vector<float> DgendecayvtxY;
+	std::vector<float> DgendecayvtxZ;
 
 	bool useAnyMVA_;
 	bool isSkimMVA_;
@@ -287,12 +294,7 @@ private:
 	int genD0_centrality;
 	int N_genD0s;
 
-	std::vector<float> DgenprodvtxX;
-	std::vector<float> DgenprodvtxY;
-	std::vector<float> DgenprodvtxZ;
-	std::vector<float> DgendecayvtxX;
-	std::vector<float> DgendecayvtxY;
-	std::vector<float> DgendecayvtxZ;
+	
 
 	edm::Handle<int> cbin_;
 
@@ -410,8 +412,8 @@ private:
 		f(DgendecayvtxY);
 		f(DgendecayvtxZ);
 
-		f(genD0_firstRealMotherPdgID);
-		f(genD0_isPrompt);
+		f(Dgen_firstRealMotherPdgID);
+		f(Dgen_isPrompt);
 	}
 
 }; //--EDAnalyzer
@@ -910,7 +912,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 			iddau1[it] = -999;
 			iddau2[it] = -999;
 
-			genD0_firstRealMotherPdgID[it] = -999;
+			Dgen_firstRealMotherPdgID[it] = -999;
 
 			DgenprodvtxX[it] = -999.9;
 			DgenprodvtxY[it] = -999.9;
@@ -919,7 +921,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 			DgendecayvtxY[it] = -999.9;
 			DgendecayvtxZ[it] = -999.9;
 
-			genD0_isPrompt[it] = -1;
+			Dgen_isPrompt[it] = -1;
 
 			if (doGenMatching_)
 			{
@@ -981,8 +983,8 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 							genDecayLength(it, genD0);
 
 							const GenAncestryInfo ancestry = walkGenAncestry(genD0);
-							genD0_firstRealMotherPdgID[it] = ancestry.firstRealMotherPdgId;
-							genD0_isPrompt[it] = ancestry.hasBottomAncestor ? 0 : 1;
+							Dgen_firstRealMotherPdgID[it] = ancestry.firstRealMotherPdgId;
+							Dgen_isPrompt[it] = ancestry.hasBottomAncestor ? 0 : 1;
 							
 
 							pt_gen[it] = genD0.pt();
@@ -1028,8 +1030,8 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 							genDecayLength(it, genD0);
 
 							const GenAncestryInfo ancestry = walkGenAncestry(genD0);
-							genD0_firstRealMotherPdgID[it] = ancestry.firstRealMotherPdgId;
-							genD0_isPrompt[it] = ancestry.hasBottomAncestor ? 0 : 1;
+							Dgen_firstRealMotherPdgID[it] = ancestry.firstRealMotherPdgId;
+							Dgen_isPrompt[it] = ancestry.hasBottomAncestor ? 0 : 1;
 							
 
 							pt_gen[it] = genD0.pt();
@@ -1323,8 +1325,8 @@ void VCTreeProducer_D02kpi::initTree()
 				VertexCompositeNtuple->Branch("DgendecayvtxY", &DgendecayvtxY);
 				VertexCompositeNtuple->Branch("DgendecayvtxZ", &DgendecayvtxZ);
 
-				VertexCompositeNtuple->Branch("genD0_firstRealMotherPdgID", &genD0_firstRealMotherPdgID);
-				VertexCompositeNtuple->Branch("genD0_isPrompt", &genD0_isPrompt);
+				VertexCompositeNtuple->Branch("Dgen_firstRealMotherPdgID", &Dgen_firstRealMotherPdgID);
+				VertexCompositeNtuple->Branch("Dgen_isPrompt", &Dgen_isPrompt);
 
 
 				AllGensNtuple->Branch("N_genD0s", &N_genD0s, "N_genD0s/I");
