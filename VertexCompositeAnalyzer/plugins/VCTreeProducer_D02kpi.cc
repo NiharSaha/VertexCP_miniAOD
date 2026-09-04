@@ -269,7 +269,7 @@ private:
 	std::vector<int> iddau1;
 	std::vector<int> iddau2;
 	std::vector<int> Dgen_firstRealMotherPdgID;
-	std::vector<int> Dgen_isPrompt;
+	std::vector<bool> Dgen_isPrompt;
 
 	std::vector<float> DgenprodvtxX;
 	std::vector<float> DgenprodvtxY;
@@ -921,7 +921,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 			DgendecayvtxY[it] = -999.9;
 			DgendecayvtxZ[it] = -999.9;
 
-			Dgen_isPrompt[it] = -1;
+			Dgen_isPrompt[it] = false;
 
 			if (doGenMatching_)
 			{
@@ -984,7 +984,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 
 							const GenAncestryInfo ancestry = walkGenAncestry(genD0);
 							Dgen_firstRealMotherPdgID[it] = ancestry.firstRealMotherPdgId;
-							Dgen_isPrompt[it] = ancestry.hasBottomAncestor ? 0 : 1;
+							Dgen_isPrompt[it] = !ancestry.hasBottomAncestor;
 							
 
 							pt_gen[it] = genD0.pt();
@@ -1031,7 +1031,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 
 							const GenAncestryInfo ancestry = walkGenAncestry(genD0);
 							Dgen_firstRealMotherPdgID[it] = ancestry.firstRealMotherPdgId;
-							Dgen_isPrompt[it] = ancestry.hasBottomAncestor ? 0 : 1;
+							Dgen_isPrompt[it] = !ancestry.hasBottomAncestor;
 							
 
 							pt_gen[it] = genD0.pt();
