@@ -123,8 +123,8 @@ private:
 	virtual void endJob();
 	virtual void initTree();
 	
-	void genDecayLength(const uint &, const reco::GenParticle &, const math::XYZPoint &);
-	math::XYZPoint getTrueGenPV(const reco::GenParticleCollection &genpars, bool &ok) const;
+	void genDecayLength(const uint &, const reco::GenParticle &);
+	
 
 
 	// Result of a walk up the gen mother chain, used to classify a gen D0 as prompt/non-prompt
@@ -222,7 +222,6 @@ private:
 	std::vector<float> gen_dl;
 	std::vector<float> gen_dl2D;
 	std::vector<float> twoTrackDCA;
-
 	std::vector<int> genMatchIdx;
 
 	// dau info
@@ -270,7 +269,7 @@ private:
 	std::vector<int> iddau1;
 	std::vector<int> iddau2;
 	std::vector<int> genD0_firstRealMotherPdgID;
-	std::vector<bool> genD0_hasBottomAncestor;
+	std::vector<int> genD0_isPrompt;
 
 	bool useAnyMVA_;
 	bool isSkimMVA_;
@@ -412,7 +411,7 @@ private:
 		f(DgendecayvtxZ);
 
 		f(genD0_firstRealMotherPdgID);
-		f(genD0_hasBottomAncestor);
+		f(genD0_isPrompt);
 	}
 
 }; //--EDAnalyzer
@@ -706,15 +705,6 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 	// if (!vertexHandle.isValid() || vertexHandle->empty()) return;
 	//++++++++++++++++++++++++++++++++++++++++++
 
-	math::XYZPoint truePV(0., 0., 0.);
-	if (genpars.isValid())
-	{
-		bool truePVset = false;
-		truePV = getTrueGenPV(*genpars, truePVset);
-		if (doGenMatching_ && !truePVset)
-			edm::LogWarning("GenVertex")
-				<< "Could not determine true gen PV; gen decay lengths referenced to (0,0,0).";
-	}
 
 
 
@@ -921,7 +911,6 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 			iddau2[it] = -999;
 
 			genD0_firstRealMotherPdgID[it] = -999;
-			genD0_hasBottomAncestor[it] = false;
 
 			DgenprodvtxX[it] = -999.9;
 			DgenprodvtxY[it] = -999.9;
@@ -930,6 +919,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 			DgendecayvtxY[it] = -999.9;
 			DgendecayvtxZ[it] = -999.9;
 
+			genD0_isPrompt[it] = -1;
 
 			if (doGenMatching_)
 			{
@@ -988,11 +978,12 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 
 							if (reco_d1->pdgId() != gen_d1->pdgId())
 								isSwap[it] = true;
-							genDecayLength(it, genD0, truePV);
+							genDecayLength(it, genD0);
 
 							const GenAncestryInfo ancestry = walkGenAncestry(genD0);
 							genD0_firstRealMotherPdgID[it] = ancestry.firstRealMotherPdgId;
-							genD0_hasBottomAncestor[it] = ancestry.hasBottomAncestor;
+							genD0_isPrompt[it] = ancestry.hasBottomAncestor ? 0 : 1;
+							
 
 							pt_gen[it] = genD0.pt();
 							eta_gen[it] = genD0.eta();
@@ -1034,11 +1025,12 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 
 							if (reco_d1->pdgId() != gen_d2->pdgId())
 								isSwap[it] = true;
-							genDecayLength(it, genD0, truePV);
+							genDecayLength(it, genD0);
 
 							const GenAncestryInfo ancestry = walkGenAncestry(genD0);
 							genD0_firstRealMotherPdgID[it] = ancestry.firstRealMotherPdgId;
-							genD0_hasBottomAncestor[it] = ancestry.hasBottomAncestor;
+							genD0_isPrompt[it] = ancestry.hasBottomAncestor ? 0 : 1;
+							
 
 							pt_gen[it] = genD0.pt();
 							eta_gen[it] = genD0.eta();
@@ -1332,7 +1324,8 @@ void VCTreeProducer_D02kpi::initTree()
 				VertexCompositeNtuple->Branch("DgendecayvtxZ", &DgendecayvtxZ);
 
 				VertexCompositeNtuple->Branch("genD0_firstRealMotherPdgID", &genD0_firstRealMotherPdgID);
-				VertexCompositeNtuple->Branch("genD0_hasBottomAncestor", &genD0_hasBottomAncestor);
+				VertexCompositeNtuple->Branch("genD0_isPrompt", &genD0_isPrompt);
+
 
 				AllGensNtuple->Branch("N_genD0s", &N_genD0s, "N_genD0s/I");
 				AllGensNtuple->Branch("genD0_centrality", &genD0_centrality);
@@ -1370,7 +1363,7 @@ void VCTreeProducer_D02kpi::endJob()
 {
 }
 
-// Single walk up the gen mother chain: tags whether genD0 descends from a b hadron
+// Walk up the gen mother chain: tags whether genD0 descends from a b hadron
 // and records the first ancestor with a different pdgId, for prompt/non-prompt classification.
 VCTreeProducer_D02kpi::GenAncestryInfo VCTreeProducer_D02kpi::walkGenAncestry(const reco::GenParticle &genD0) const
 {
@@ -1378,88 +1371,54 @@ VCTreeProducer_D02kpi::GenAncestryInfo VCTreeProducer_D02kpi::walkGenAncestry(co
 
 	const reco::Candidate *cur = &genD0;
 	bool foundFirstRealMother = false;
+	const int selfAbsId = std::abs(genD0.pdgId());
 	const int maxSteps = 50;
 	for (int nSteps = 0; cur && cur->numberOfMothers() > 0 && nSteps < maxSteps; ++nSteps)
 	{
-		const reco::Candidate *mom = cur->mother();
-		if (!mom)
-			break;
-
-		const int momId = mom->pdgId();
-		const int absId = std::abs(momId);
-
-		if (!foundFirstRealMother && absId != std::abs(genD0.pdgId()))
+		// check EVERY mother at this level, not just mother(0)
+		for (size_t i = 0; i < cur->numberOfMothers(); ++i)
 		{
-			info.firstRealMotherPdgId = momId;
-			foundFirstRealMother = true;
+			const reco::Candidate *mom = cur->mother(i);
+			if (!mom) continue;
+
+			const int momId = mom->pdgId();
+			const int absId = std::abs(momId);
+
+			if (!foundFirstRealMother && absId != selfAbsId)
+			{
+				info.firstRealMotherPdgId = momId;
+				foundFirstRealMother = true;
+			}
+
+			const bool bMeson  = (absId / 100) % 10 == 5;
+			const bool bBaryon = (absId / 1000) % 10 == 5;
+			const bool bottomonium = bMeson && (absId / 10) % 10 == 5; 
+			if ((bMeson || bBaryon) && !bottomonium)
+			{
+				info.hasBottomAncestor = true;
+				return info;
+			}
 		}
 
-		if ((absId / 100) % 10 == 5 || (absId / 1000) % 10 == 5)
-		{
-			info.hasBottomAncestor = true;
-			break;
-		}
-
-		cur = mom;
+		cur = cur->mother(); 
 	}
+
 	return info;
 }
-/*
-The reconstructed PV is in MiniAOD (offlineSlimmedPrimaryVertices — that's bestvx/y/z). 
-But in miniAOD, dedicated generator-truth PV product is missing, which exists in AOD. 
-That truth information isn't lost though — every particle in prunedGenParticles still carries its production vertex, 
-already vertex-smeared (consistent with SIM/RECO). So we recover the gen PV by 
-finding a particle that we know was produced at the primary interaction point and reading its vertex.
 
-getTrueGenPV gives a PV that is correct for both prompt & non-prompt, 
-so gen_dl = (D0 decay vertex − true PV) gives the flight length (b + D0) for non-prompt and just the D0 flight for prompt.
-*/
-math::XYZPoint VCTreeProducer_D02kpi::getTrueGenPV(const reco::GenParticleCollection &genpars, bool &ok) const
+void VCTreeProducer_D02kpi::genDecayLength(const uint &it, const reco::GenParticle &gCand)
 {
-	ok = false;
-
-	// g.isHardProcess() is true for a particle from the matrix-element hard scattering (PV).
-	for (const auto &g : genpars)
-		if (g.isHardProcess())
-		{
-			ok = true;
-			return g.vertex();
-		}
-
-	// g.isPromptFinalState() is true for the first prompt final-state particle straight from fragmentation / the hard process.
-	for (const auto &g : genpars)
-		if (g.isPromptFinalState())
-		{
-			ok = true;
-			return g.vertex();
-		}
-
-	return math::XYZPoint(0., 0., 0.);
-}
-
-
-
-void VCTreeProducer_D02kpi::genDecayLength(const uint &it, const reco::GenParticle &gCand, const math::XYZPoint &truePV)
-{
-	gen_dl[it] = -999.9;
-	gen_agl_abs[it] = -999.9;
-	gen_dl2D[it] = -999.9;
-	gen_agl2D_abs[it] = -999.9;
-	
-	if (gCand.numberOfDaughters() == 0 || !gCand.daughter(0))
-		return;
-
-	const auto &dauVtx = gCand.daughter(0)->vertex();
+	gen_dl[it] = -999.9; gen_agl_abs[it] = -999.9; gen_dl2D[it] = -999.9; gen_agl2D_abs[it] = -999.9;
+	if(gCand.numberOfDaughters()==0 || !gCand.daughter(0)) return;
+	const auto& dauVtx = gCand.daughter(0)->vertex();
+	TVector3 ptosvec(dauVtx.X(), dauVtx.Y(), dauVtx.Z());
 	TVector3 secvec(gCand.px(), gCand.py(), gCand.pz());
-	TVector3 secvec2D(gCand.px(), gCand.py(), 0.0);
-
-	TVector3 ptosvec(dauVtx.X() - truePV.X(), dauVtx.Y() - truePV.Y(), dauVtx.Z() - truePV.Z());
 	gen_agl_abs[it] = secvec.Angle(ptosvec);
-	gen_dl[it] = ptosvec.Mag();
-
-	TVector3 ptosvec2D(dauVtx.X() - truePV.X(), dauVtx.Y() - truePV.Y(), 0.0);
+	gen_dl[it]  = ptosvec.Mag();
+	TVector3 ptosvec2D(dauVtx.X(), dauVtx.Y(), 0.0);
+	TVector3 secvec2D(gCand.px(), gCand.py(), 0.0);
 	gen_agl2D_abs[it] = secvec2D.Angle(ptosvec2D);
-	gen_dl2D[it] = ptosvec2D.Mag();
+	gen_dl2D[it]  = ptosvec2D.Mag();
 }
 
 // define this as a plug-in
