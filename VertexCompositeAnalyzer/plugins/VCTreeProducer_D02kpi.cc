@@ -122,15 +122,15 @@ private:
 	virtual void saveAllGens(const edm::Event &, const edm::EventSetup &);
 	virtual void endJob();
 	virtual void initTree();
-	
-	void genDecayLength(const uint &, const reco::GenParticle &);
-	
 
+	void genDecayLength(const uint &, const reco::GenParticle &);
 
 	// Result of a walk up the gen mother chain, used to classify a gen D0 as prompt/non-prompt
 	struct GenAncestryInfo
 	{
 		int firstRealMotherPdgId = 0;
+		math::XYZPoint bottomAncestorVertex;
+		int bottomAncestorPdgId = 0;
 		bool hasBottomAncestor = false;
 	};
 	GenAncestryInfo walkGenAncestry(const reco::GenParticle &) const;
@@ -140,7 +140,7 @@ private:
 	edm::Service<TFileService> fs;
 
 	TTree *VertexCompositeNtuple;
-	TTree *AllGensNtuple;
+	TTree *AllGensNtuple = nullptr;
 	bool saveTree_;
 
 	// options
@@ -263,12 +263,21 @@ private:
 	// gen info
 	std::vector<float> pt_gen;
 	std::vector<float> eta_gen;
-	std::vector<int> idmom;
 	std::vector<float> y_gen;
 	std::vector<float> phi_gen;
 	std::vector<int> iddau1;
 	std::vector<int> iddau2;
-	std::vector<int> Dgen_firstRealMotherPdgID;
+
+	std::vector<int> idmom;
+	std::vector<float> Dgen_motherVtxX;
+	std::vector<float> Dgen_motherVtxY;
+	std::vector<float> Dgen_motherVtxZ;
+
+	std::vector<int> Dgen_firstMotherPdgID;
+	std::vector<float> Dgen_bAncestorVtxX;
+	std::vector<float> Dgen_bAncestorVtxY;
+	std::vector<float> Dgen_bAncestorVtxZ;
+	std::vector<int> Dgen_bAncestorPdgID;
 	std::vector<bool> Dgen_isPrompt;
 
 	std::vector<float> DgenprodvtxX;
@@ -294,8 +303,6 @@ private:
 	int genD0_centrality;
 	int N_genD0s;
 
-	
-
 	edm::Handle<int> cbin_;
 
 	// tokens
@@ -309,7 +316,6 @@ private:
 	edm::EDGetTokenT<edm::ValueMap<reco::DeDxData>> Dedx_Token1_;
 	edm::EDGetTokenT<edm::ValueMap<reco::DeDxData>> Dedx_Token2_;
 	edm::EDGetTokenT<reco::GenParticleCollection> tok_genParticle_;
-	
 
 	edm::EDGetTokenT<int> tok_centBinLabel_;
 	edm::EDGetTokenT<reco::Centrality> tok_centSrc_;
@@ -400,7 +406,6 @@ private:
 		f(gen_dl2D);
 		f(pt_gen);
 		f(eta_gen);
-		f(idmom);
 		f(y_gen);
 		f(phi_gen);
 		f(iddau1);
@@ -411,8 +416,16 @@ private:
 		f(DgendecayvtxX);
 		f(DgendecayvtxY);
 		f(DgendecayvtxZ);
+		f(idmom);
+		f(Dgen_motherVtxX);
+		f(Dgen_motherVtxY);
+		f(Dgen_motherVtxZ);
 
-		f(Dgen_firstRealMotherPdgID);
+		f(Dgen_firstMotherPdgID);
+		f(Dgen_bAncestorVtxX);
+		f(Dgen_bAncestorVtxY);
+		f(Dgen_bAncestorVtxZ);
+		f(Dgen_bAncestorPdgID);
 		f(Dgen_isPrompt);
 	}
 
@@ -544,7 +557,7 @@ VCTreeProducer_D02kpi::VCTreeProducer_D02kpi(const edm::ParameterSet &iConfig) :
 	Dedx_Token1_ = consumes<edm::ValueMap<reco::DeDxData>>(edm::InputTag("dedxHarmonic2"));
 	Dedx_Token2_ = consumes<edm::ValueMap<reco::DeDxData>>(edm::InputTag("dedxTruncated40"));
 	tok_genParticle_ = consumes<reco::GenParticleCollection>(edm::InputTag(iConfig.getUntrackedParameter<edm::InputTag>("GenParticleCollection")));
-	
+
 	bsLabel_ = consumes<reco::BeamSpot>(iConfig.getParameter<edm::InputTag>("BSLabel"));
 
 	if (isCentrality_)
@@ -604,7 +617,6 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 	if (doGenMatching_)
 		iEvent.getByToken(tok_genParticle_, genpars);
 
-	
 	genD0_PdgID.clear();
 	genD0_pt.clear();
 	genD0_eta.clear();
@@ -628,7 +640,8 @@ void VCTreeProducer_D02kpi::saveAllGens(const edm::Event &iEvent, const edm::Eve
 
 		const reco::Candidate *gen_d1 = genD0.daughter(0);
 		const reco::Candidate *gen_d2 = genD0.daughter(1);
-		if (!gen_d1 || !gen_d2) continue;
+		if (!gen_d1 || !gen_d2)
+			continue;
 
 		// cout << "genD0 pdgId = " << genD0.pdgId() << " with dau1 pdgId = " << gen_d1->pdgId() << " and dau2 pdgId = " << gen_d2->pdgId() << endl;
 		if (!((std::abs(gen_d1->pdgId()) == PID_dau1_ && std::abs(gen_d2->pdgId()) == PID_dau2_) || (std::abs(gen_d2->pdgId()) == PID_dau1_ && std::abs(gen_d1->pdgId()) == PID_dau2_)))
@@ -706,9 +719,6 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 	const auto &vertexHandle = iEvent.getHandle(tok_offlinePV_);
 	// if (!vertexHandle.isValid() || vertexHandle->empty()) return;
 	//++++++++++++++++++++++++++++++++++++++++++
-
-
-
 
 #ifdef DEBUG
 	cout << "Loaded tokens" << endl;
@@ -912,7 +922,15 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 			iddau1[it] = -999;
 			iddau2[it] = -999;
 
-			Dgen_firstRealMotherPdgID[it] = -999;
+			Dgen_motherVtxX[it] = -999.9;
+			Dgen_motherVtxY[it] = -999.9;
+			Dgen_motherVtxZ[it] = -999.9;
+
+			Dgen_firstMotherPdgID[it] = -999;
+			Dgen_bAncestorVtxX[it] = -999.9;
+			Dgen_bAncestorVtxY[it] = -999.9;
+			Dgen_bAncestorVtxZ[it] = -999.9;
+			Dgen_bAncestorPdgID[it] = -999;
 
 			DgenprodvtxX[it] = -999.9;
 			DgenprodvtxY[it] = -999.9;
@@ -953,8 +971,7 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 					if (!(fabs(gen_d1->pdgId()) == PID_dau1_ && fabs(gen_d2->pdgId()) == PID_dau2_) && !(fabs(gen_d2->pdgId()) == PID_dau1_ && fabs(gen_d1->pdgId()) == PID_dau2_))
 						continue; // make sure k pi pairs
 
-					// If it passed the checks above, it means this D0 was saved to ntGen.
-					// Grab the current index, then increment the counter for the next loop.
+					
 					int current_ntGen_index = valid_gen_d0_count;
 					valid_gen_d0_count++;
 
@@ -983,9 +1000,24 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 							genDecayLength(it, genD0);
 
 							const GenAncestryInfo ancestry = walkGenAncestry(genD0);
-							Dgen_firstRealMotherPdgID[it] = ancestry.firstRealMotherPdgId;
+							Dgen_firstMotherPdgID[it] = ancestry.firstRealMotherPdgId;
+
 							Dgen_isPrompt[it] = !ancestry.hasBottomAncestor;
-							
+
+							if (ancestry.hasBottomAncestor)
+							{
+								Dgen_bAncestorVtxX[it] = ancestry.bottomAncestorVertex.X();
+								Dgen_bAncestorVtxY[it] = ancestry.bottomAncestorVertex.Y();
+								Dgen_bAncestorVtxZ[it] = ancestry.bottomAncestorVertex.Z();
+								Dgen_bAncestorPdgID[it] = ancestry.bottomAncestorPdgId;
+							}
+
+							if (genD0.mother())
+							{
+								Dgen_motherVtxX[it] = genD0.mother()->vx();
+								Dgen_motherVtxY[it] = genD0.mother()->vy();
+								Dgen_motherVtxZ[it] = genD0.mother()->vz();
+							}
 
 							pt_gen[it] = genD0.pt();
 							eta_gen[it] = genD0.eta();
@@ -1030,9 +1062,24 @@ void VCTreeProducer_D02kpi::fillRECO(const edm::Event &iEvent, const edm::EventS
 							genDecayLength(it, genD0);
 
 							const GenAncestryInfo ancestry = walkGenAncestry(genD0);
-							Dgen_firstRealMotherPdgID[it] = ancestry.firstRealMotherPdgId;
+							Dgen_firstMotherPdgID[it] = ancestry.firstRealMotherPdgId;
+
 							Dgen_isPrompt[it] = !ancestry.hasBottomAncestor;
-							
+
+							if (ancestry.hasBottomAncestor)
+							{
+								Dgen_bAncestorVtxX[it] = ancestry.bottomAncestorVertex.X();
+								Dgen_bAncestorVtxY[it] = ancestry.bottomAncestorVertex.Y();
+								Dgen_bAncestorVtxZ[it] = ancestry.bottomAncestorVertex.Z();
+								Dgen_bAncestorPdgID[it] = ancestry.bottomAncestorPdgId;
+							}
+
+							if (genD0.mother())
+							{
+								Dgen_motherVtxX[it] = genD0.mother()->vx();
+								Dgen_motherVtxY[it] = genD0.mother()->vy();
+								Dgen_motherVtxZ[it] = genD0.mother()->vz();
+							}
 
 							pt_gen[it] = genD0.pt();
 							eta_gen[it] = genD0.eta();
@@ -1224,7 +1271,8 @@ void VCTreeProducer_D02kpi::beginJob()
 void VCTreeProducer_D02kpi::initTree()
 {
 	VertexCompositeNtuple = fs->make<TTree>("VCNtuple_D02kpi", "VCNtuple_D02kpi");
-	AllGensNtuple = fs->make<TTree>("AllGensNtuple", "AllGensNtuple");
+	if (doGenMatching_)
+		AllGensNtuple = fs->make<TTree>("AllGensNtuple", "AllGensNtuple");
 
 	if (doRecoNtuple_)
 	{
@@ -1325,9 +1373,27 @@ void VCTreeProducer_D02kpi::initTree()
 				VertexCompositeNtuple->Branch("DgendecayvtxY", &DgendecayvtxY);
 				VertexCompositeNtuple->Branch("DgendecayvtxZ", &DgendecayvtxZ);
 
-				VertexCompositeNtuple->Branch("Dgen_firstRealMotherPdgID", &Dgen_firstRealMotherPdgID);
-				VertexCompositeNtuple->Branch("Dgen_isPrompt", &Dgen_isPrompt);
+				VertexCompositeNtuple->Branch("pT_gen", &pt_gen);
+				VertexCompositeNtuple->Branch("eta_gen", &eta_gen);
+				VertexCompositeNtuple->Branch("y_gen", &y_gen);
+				VertexCompositeNtuple->Branch("phi_gen", &phi_gen);
+				VertexCompositeNtuple->Branch("MotherID_gen", &idmom);
 
+				if (decayInGen_)
+				{
+					VertexCompositeNtuple->Branch("DauID1_gen", &iddau1);
+					VertexCompositeNtuple->Branch("DauID2_gen", &iddau2);
+				}
+				VertexCompositeNtuple->Branch("Dgen_motherVtxX", &Dgen_motherVtxX);
+				VertexCompositeNtuple->Branch("Dgen_motherVtxY", &Dgen_motherVtxY);
+				VertexCompositeNtuple->Branch("Dgen_motherVtxZ", &Dgen_motherVtxZ);
+
+				VertexCompositeNtuple->Branch("Dgen_firstMotherPdgID", &Dgen_firstMotherPdgID);
+				VertexCompositeNtuple->Branch("Dgen_isPrompt", &Dgen_isPrompt);
+				VertexCompositeNtuple->Branch("Dgen_bAncestorVtxX", &Dgen_bAncestorVtxX);
+				VertexCompositeNtuple->Branch("Dgen_bAncestorVtxY", &Dgen_bAncestorVtxY);
+				VertexCompositeNtuple->Branch("Dgen_bAncestorVtxZ", &Dgen_bAncestorVtxZ);
+				VertexCompositeNtuple->Branch("Dgen_bAncestorPdgID", &Dgen_bAncestorPdgID);
 
 				AllGensNtuple->Branch("N_genD0s", &N_genD0s, "N_genD0s/I");
 				AllGensNtuple->Branch("genD0_centrality", &genD0_centrality);
@@ -1341,22 +1407,6 @@ void VCTreeProducer_D02kpi::initTree()
 		}
 
 	} // doRecoNtuple_
-
-	if (doGenNtuple_)
-	{
-		VertexCompositeNtuple->Branch("pT_gen", &pt_gen);
-		VertexCompositeNtuple->Branch("eta_gen", &eta_gen);
-		VertexCompositeNtuple->Branch("y_gen", &y_gen);
-		VertexCompositeNtuple->Branch("phi_gen", &phi_gen);
-		VertexCompositeNtuple->Branch("MotherID_gen", &idmom);
-
-		if (decayInGen_)
-		{
-
-			VertexCompositeNtuple->Branch("DauID1_gen", &iddau1);
-			VertexCompositeNtuple->Branch("DauID2_gen", &iddau2);
-		}
-	}
 }
 
 // ------------ method called once each job just after ending the event
@@ -1366,7 +1416,6 @@ void VCTreeProducer_D02kpi::endJob()
 }
 
 // Walk up the gen mother chain: tags whether genD0 descends from a b hadron
-// and records the first ancestor with a different pdgId, for prompt/non-prompt classification.
 VCTreeProducer_D02kpi::GenAncestryInfo VCTreeProducer_D02kpi::walkGenAncestry(const reco::GenParticle &genD0) const
 {
 	GenAncestryInfo info;
@@ -1381,7 +1430,8 @@ VCTreeProducer_D02kpi::GenAncestryInfo VCTreeProducer_D02kpi::walkGenAncestry(co
 		for (size_t i = 0; i < cur->numberOfMothers(); ++i)
 		{
 			const reco::Candidate *mom = cur->mother(i);
-			if (!mom) continue;
+			if (!mom)
+				continue;
 
 			const int momId = mom->pdgId();
 			const int absId = std::abs(momId);
@@ -1392,17 +1442,19 @@ VCTreeProducer_D02kpi::GenAncestryInfo VCTreeProducer_D02kpi::walkGenAncestry(co
 				foundFirstRealMother = true;
 			}
 
-			const bool bMeson  = (absId / 100) % 10 == 5;
+			const bool bMeson = (absId / 100) % 10 == 5;
 			const bool bBaryon = (absId / 1000) % 10 == 5;
-			const bool bottomonium = bMeson && (absId / 10) % 10 == 5; 
+			const bool bottomonium = bMeson && (absId / 10) % 10 == 5;
 			if ((bMeson || bBaryon) && !bottomonium)
 			{
 				info.hasBottomAncestor = true;
+				info.bottomAncestorVertex = mom->vertex();
+				info.bottomAncestorPdgId = momId;
 				return info;
 			}
 		}
 
-		cur = cur->mother(); 
+		cur = cur->mother();
 	}
 
 	return info;
@@ -1410,17 +1462,21 @@ VCTreeProducer_D02kpi::GenAncestryInfo VCTreeProducer_D02kpi::walkGenAncestry(co
 
 void VCTreeProducer_D02kpi::genDecayLength(const uint &it, const reco::GenParticle &gCand)
 {
-	gen_dl[it] = -999.9; gen_agl_abs[it] = -999.9; gen_dl2D[it] = -999.9; gen_agl2D_abs[it] = -999.9;
-	if(gCand.numberOfDaughters()==0 || !gCand.daughter(0)) return;
-	const auto& dauVtx = gCand.daughter(0)->vertex();
+	gen_dl[it] = -999.9;
+	gen_agl_abs[it] = -999.9;
+	gen_dl2D[it] = -999.9;
+	gen_agl2D_abs[it] = -999.9;
+	if (gCand.numberOfDaughters() == 0 || !gCand.daughter(0))
+		return;
+	const auto &dauVtx = gCand.daughter(0)->vertex();
 	TVector3 ptosvec(dauVtx.X(), dauVtx.Y(), dauVtx.Z());
 	TVector3 secvec(gCand.px(), gCand.py(), gCand.pz());
 	gen_agl_abs[it] = secvec.Angle(ptosvec);
-	gen_dl[it]  = ptosvec.Mag();
+	gen_dl[it] = ptosvec.Mag();
 	TVector3 ptosvec2D(dauVtx.X(), dauVtx.Y(), 0.0);
 	TVector3 secvec2D(gCand.px(), gCand.py(), 0.0);
 	gen_agl2D_abs[it] = secvec2D.Angle(ptosvec2D);
-	gen_dl2D[it]  = ptosvec2D.Mag();
+	gen_dl2D[it] = ptosvec2D.Mag();
 }
 
 // define this as a plug-in
